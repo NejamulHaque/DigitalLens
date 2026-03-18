@@ -1,0 +1,19 @@
+/* index.css — reset only, no layout constraints that conflict with Dashboard */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+#root {
+  /* FIXED: removed width:1126px and border-inline that was boxing in the dashboard */
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
