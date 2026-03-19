@@ -554,30 +554,11 @@ function PrefsPanel({ user, profile, history, bookmarks, onUpdate, onClose }) {
 
 // ── Developer Panel ───────────────────────────────────────────────────────────
 function UPIQRCode({ upiId }) {
-  const canvasRef = useRef(null);
-  const [status, setStatus] = useState("loading"); // loading | ready | error
+  const [status, setStatus] = useState("loading");
 
-  useEffect(() => {
-    if (!upiId || !canvasRef.current) return;
-    setStatus("loading");
-
-    // UPI deep-link scannable by GPay, PhonePe, Paytm, BHIM
-    const upiString = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=Nejamul%20Haque&cu=INR`;
-
-    // Dynamically import qrcode from esm.sh — pure JS, no CDN restrictions
-    import("https://esm.sh/qrcode@1.5.3")
-      .then(mod => {
-        const QR = mod.default || mod;
-        return QR.toCanvas(canvasRef.current, upiString, {
-          width: 152,
-          margin: 1,
-          color: { dark: "#1a1814", light: "#ffffff" },
-          errorCorrectionLevel: "M",
-        });
-      })
-      .then(() => setStatus("ready"))
-      .catch(() => setStatus("error"));
-  }, [upiId]);
+  const upiString = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=Nejamul%20Haque&cu=INR`;
+  // qrserver.com — free, no CORS issues, no dynamic imports needed
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=152x152&data=${encodeURIComponent(upiString)}&margin=6&color=1a1814&bgcolor=ffffff&ecc=M`;
 
   return (
     <div className="dev-qr-canvas-wrap">
@@ -593,13 +574,18 @@ function UPIQRCode({ upiId }) {
           </p>
         </div>
       )}
-      <canvas
-        ref={canvasRef}
+      <img
+        src={qrUrl}
+        alt={`UPI QR for ${upiId}`}
+        width={152}
+        height={152}
         style={{
           display: status === "ready" ? "block" : "none",
           borderRadius: 6,
-          maxWidth: "100%",
+          imageRendering: "pixelated",
         }}
+        onLoad={() => setStatus("ready")}
+        onError={() => setStatus("error")}
       />
     </div>
   );
@@ -624,6 +610,7 @@ function DeveloperPanel({ onClose }) {
   ];
   const socials = [
     { icon:"⬡", label:"GitHub", url:"https://github.com/NejamulHaque", sub:"@NejamulHaque" },
+    { icon:"⬡", label:"Portfolio", url:"https://portfolio-nejamulhaque.vercel.app/", sub:"@NejamulHaque" },
     { icon:"✉",  label:"Email",  url:"mailto:nejamulhaque05@gmail.com",  sub:"nejamulhaque05@gmail.com" },
   ];
 
@@ -640,7 +627,7 @@ function DeveloperPanel({ onClose }) {
           <p className="dev-name">Nejamul Haque</p>
           <p className="dev-role-lbl">Full Stack AI Developer &amp; Researcher</p>
           <div className="dev-badges">
-            <span className="dev-badge">◉ 5+ Years</span>
+            <span className="dev-badge">◉ 3+ Years</span>
             <span className="dev-badge">⬡ AI Specialist</span>
           </div>
         </div>
@@ -1009,4 +996,4 @@ export default function Dashboard() {
       {showPrefs&&<PrefsPanel user={user} profile={profile} history={history} bookmarks={bookmarks} onUpdate={updateUserProfile} onClose={()=>setShowPrefs(false)}/>}
     </div>
   );
-}Z
+}
