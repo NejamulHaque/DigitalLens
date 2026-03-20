@@ -1,5 +1,5 @@
 """
-NewsPulse API  ─  v3 (Fixed + Enhanced)
+DigitalLens API  ─  v3 (Fixed + Enhanced)
 
 Fixes:
   • Python 3.9 compat: replaced `str | None` with Optional[str]
@@ -32,7 +32,7 @@ except ImportError:
 
 load_dotenv()
 
-app = FastAPI(title="NewsPulse API v3", version="3.0.0")
+app = FastAPI(title="DigitalLens API v4", version="3.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -177,7 +177,7 @@ def root():
     return {
         "status":       "ok",
         "version":      "3.0.0",
-        "message":      "NewsPulse API v3",
+        "message":      "DigitalLens API v4",
         "ai_enabled":   bool(ANTHROPIC_API_KEY and _ANTHROPIC_AVAILABLE),
         "cached_articles": len(_all_cached_articles()),
     }
