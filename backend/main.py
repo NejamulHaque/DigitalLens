@@ -81,6 +81,17 @@ def summarise(text):
 def _claude():
     if not _ANTHROPIC_AVAILABLE or not ANTHROPIC_API_KEY:
         return None
+    # Supports both Anthropic direct keys (sk-ant-...) and OpenRouter keys (sk-or-v1-...)
+    is_openrouter = ANTHROPIC_API_KEY.startswith("sk-or-")
+    if is_openrouter:
+        return _anthropic.Anthropic(
+            api_key=ANTHROPIC_API_KEY,
+            base_url="https://openrouter.ai/api/v1",
+            default_headers={
+                "HTTP-Referer": "https://digital-lens.vercel.app",
+                "X-Title": "DigitalLens",
+            }
+        )
     return _anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
 def build_articles(raw, category="general"):
@@ -110,7 +121,14 @@ def build_articles(raw, category="general"):
 
 @app.get("/")
 def root():
-    return {"app": "DigitalLens API", "version": "4.0.0", "status": "ok", "ai_enabled": bool(ANTHROPIC_API_KEY and _ANTHROPIC_AVAILABLE)}
+    is_openrouter = ANTHROPIC_API_KEY.startswith("sk-or-")
+    return {
+        "app": "DigitalLens API",
+        "version": "4.0.0",
+        "status": "ok",
+        "ai_enabled": bool(ANTHROPIC_API_KEY and _ANTHROPIC_AVAILABLE),
+        "ai_provider": "OpenRouter" if is_openrouter else "Anthropic",
+    }
 
 @app.get("/health")
 def health():
