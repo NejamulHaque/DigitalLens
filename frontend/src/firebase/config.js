@@ -17,6 +17,17 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
+
+// --- VALIDATION LAYER ---
+if (!firebaseConfig.apiKey || firebaseConfig.apiKey.includes("undefined")) {
+  console.error(
+    "❌ FIREBASE ERROR: API Key is missing or invalid.\n" +
+    "Check your .env file in the /frontend directory.\n" +
+    "Make sure it contains: VITE_FIREBASE_API_KEY=...\n" +
+    "Then RESTART your dev server (npm run dev)."
+  );
+}
+
 const app      = initializeApp(firebaseConfig);
 export const auth     = getAuth(app);
 export const db       = getFirestore(app);
