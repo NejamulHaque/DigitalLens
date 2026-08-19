@@ -610,7 +610,7 @@ function DeveloperPanel({ onClose }) {
   ];
   const socials = [
     { icon:"⬡", label:"GitHub", url:"https://github.com/NejamulHaque", sub:"@NejamulHaque" },
-    { icon:"⬡", label:"Portfolio", url:"https://portfolio-nejamulhaque.vercel.app/", sub:"@NejamulHaque" },
+    { icon:"⬡", label:"Portfolio", url:"https://nejamulhaque.vercel.app/", sub:"@NejamulHaque" },
     { icon:"✉",  label:"Email",  url:"mailto:nejamulhaque05@gmail.com",  sub:"nejamulhaque05@gmail.com" },
   ];
 
