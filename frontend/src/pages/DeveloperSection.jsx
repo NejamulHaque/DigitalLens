@@ -15,7 +15,7 @@ const DeveloperSection = () => {
         <div className="dev-content">
           <div className="dev-info">
             <h4>Nejamul Haque</h4>
-            <p className="dev-role">Full Stack, AI Developer & Researcher</p>
+            <p className="dev-role">DevSecOps Engineer, Developer & Researcher</p>
             <p className="dev-bio">
               Passionate about building intelligent systems that bridge the gap between complex AI and user-friendly interfaces.
             </p>

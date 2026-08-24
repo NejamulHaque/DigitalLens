@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from "react";
 
 const DEV = {
   name: "Nejamul Haque",
-  role: "Full Stack Developer & AI Enthusiast",
+  role: "DevSecOps Engineer, Developer & Researcher",
   bio: "3rd year CS student building real-world AI-powered apps. Exploring NLP, LLMs, and modern full-stack development with Python & React.",
   location: "Patna, Bihar, India",
   college: "B.Tech — Computer Science",

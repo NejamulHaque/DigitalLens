@@ -1,9 +1,21 @@
+# ─────────────────────────────────────────────────────────────
+# DigitalLens API v4.1 — FastAPI Backend
+# ✅ Free real-time news (Google RSS) + NewsAPI fallback
+# ✅ Router registration fixed (no more NameError crash)
+# ✅ Claude AI / OpenRouter integration
+# ─────────────────────────────────────────────────────────────
 from fastapi import FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List
-import requests, os, time, re, json
+from urllib.parse import quote
 from dotenv import load_dotenv
+import requests, os, time, re, json
+import html as _html
+import feedparser
+from routers import admin  # ✅ imports at top are fine
+
+from routers import irus, free_news   # ✅ imports at top are fine
 
 load_dotenv()
 
@@ -13,7 +25,7 @@ try:
 except ImportError:
     _ANTHROPIC_AVAILABLE = False
 
-app = FastAPI(title="DigitalLens API", version="4.0.0")
+app = FastAPI(title="DigitalLens API", version="4.1.0")   # ✅ app created FIRST
 
 NEWS_API_KEY      = os.getenv("NEWS_API_KEY", "")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
@@ -26,6 +38,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ── In-memory cache (5-min TTL) ──────────────────────────────
 _cache: dict = {}
 CACHE_TTL = 300
 
@@ -47,27 +60,40 @@ def all_articles():
                     out.append(item)
     return out
 
-STOP = {"about","which","their","would","could","there","these","those","after","being","where","since","while","under","other","first","should","still","have","that","with","from","this","will","were","been","more","also","than","into","when","they","what","some","news","says","said","just","your"}
+# ── NLP helpers ──────────────────────────────────────────────
+STOP = {"about", "which", "their", "would", "could", "there", "these", "those",
+        "after", "being", "where", "since", "while", "under", "other", "first",
+        "should", "still", "have", "that", "with", "from", "this", "will",
+        "were", "been", "more", "also", "than", "into", "when", "they",
+        "what", "some", "news", "says", "said", "just", "your","nbsp", "amp", "quot", "html", "https", "http"}
 
 def extract_tags(text):
-    words = re.sub(r"[^a-z\s]", "", text.lower()).split()
+    words = re.sub(r"[^a-z\u0900-\u097F\s]", "", text.lower()).split()
     freq = {}
     for w in words:
         if len(w) > 4 and w not in STOP:
             freq[w] = freq.get(w, 0) + 1
     return [w for w, _ in sorted(freq.items(), key=lambda x: -x[1])[:6]]
 
-POS = {"growth","rises","record","gains","success","win","boost","advance","improve","launch","recovery","strong","rally"}
-NEG = {"crisis","crash","falls","drops","death","war","attack","fail","collapse","flood","fire","kill","threat","decline"}
+POS = {"growth", "rises", "record", "gains", "success", "win", "wins", "boost",
+       "boosts", "advance", "improve", "improves", "launch", "recovery", "strong",
+       "rally", "soars", "surge", "surges", "breakthrough", "hope", "peace",
+       "deal", "approves", "aid", "support", "investment", "innovation", "celebrates", "जीत", "विकास", "उपलब्धि", "बढ़ोतरी", "सफल", "खुशखबरी", "रिकॉर्ड", "लॉन्च", "शांति"}
+
+NEG = {"crisis", "crash", "falls", "drops", "death", "dies", "killed", "kills",
+       "war", "attack", "attacks", "fail", "collapse", "flood", "fire", "kill",
+       "threat", "threats", "decline", "missile", "missiles", "strike", "strikes",
+       "conflict", "sanctions", "fears", "warning", "layoffs", "sues", "guilty",
+       "arrested", "explosion", "हमला", "हत्या", "दुर्घटना", "संकट", "मौत", "युद्ध", "गिरावट", "आरोप", "हिंसा"}
 
 def analyse_sentiment(text):
     words = set(text.lower().split())
     pos = len(words & POS)
     neg = len(words & NEG)
     if pos > neg:
-        return {"mood": "positive", "score": round(0.65 + min(pos,4)*0.06, 3)}
+        return {"mood": "positive", "score": round(0.65 + min(pos, 4) * 0.06, 3)}
     if neg > pos:
-        return {"mood": "negative", "score": round(0.65 + min(neg,4)*0.06, 3)}
+        return {"mood": "negative", "score": round(0.65 + min(neg, 4) * 0.06, 3)}
     return {"mood": "neutral", "score": 0.55}
 
 def summarise(text):
@@ -78,10 +104,10 @@ def summarise(text):
     short = " ".join(sentences[:2]) if sentences else " ".join(words[:50])
     return short[:280] + ("..." if len(short) > 280 else "")
 
+# ── Claude / OpenRouter client ───────────────────────────────
 def _claude():
     if not _ANTHROPIC_AVAILABLE or not ANTHROPIC_API_KEY:
         return None
-    # Supports both Anthropic direct keys (sk-ant-...) and OpenRouter keys (sk-or-v1-...)
     is_openrouter = ANTHROPIC_API_KEY.startswith("sk-or-")
     if is_openrouter:
         return _anthropic.Anthropic(
@@ -103,7 +129,7 @@ def build_articles(raw, category="general"):
         summary = summarise(content or description)
         sentiment = analyse_sentiment(full)
         tags = extract_tags(full)
-        title = (a.get("title") or "").replace(" [+...]","").strip()
+        title = (a.get("title") or "").replace("[...]", "").strip()
         if not title or title == "[Removed]":
             continue
         out.append({
@@ -119,56 +145,137 @@ def build_articles(raw, category="general"):
         })
     return out
 
+# ── 🚀 FREE UNLIMITED NEWS: Google News RSS ──────────────────
+RSS_TOPICS = {
+    "general": None,
+    "technology": "TECHNOLOGY",
+    "business": "BUSINESS",
+    "sports": "SPORTS",
+    "health": "HEALTH",
+    "science": "SCIENCE",
+    "entertainment": "ENTERTAINMENT",
+}
+LANGS = {
+    "en": ("en", "US", "US:en"),
+    "hi": ("hi", "IN", "IN:hi"),      # हिन्दी
+    "bn": ("bn", "IN", "IN:bn"),      # বাংলা
+    "ur": ("ur", "PK", "PK:ur"),      # اردو
+    "es": ("es", "ES", "ES:es"),
+    "fr": ("fr", "FR", "FR:fr"),
+    "ar": ("ar", "AE", "AE:ar"),
+    "zh": ("zh-CN", "CN", "CN:zh-Hans"),
+    "ja": ("ja", "JP", "JP:ja"),
+}
+
+def strip_html(text):
+    t = re.sub(r"<[^>]+>", " ", text or "")   # strip HTML tags
+    t = _html.unescape(t)                     # &amp;→&  &quot;→"  &nbsp;→\xa0
+    t = t.replace("\xa0", " ")                # non-breaking space → space
+    return re.sub(r"\s+", " ", t).strip()
+
+def fetch_rss(category, q, limit, lang="en"):
+    """Real-time news from Google News RSS — native language editions."""
+    hl, gl, ceid = LANGS.get(lang, LANGS["en"])
+    if q:
+        url = f"https://news.google.com/rss/search?q={quote(q)}+when:2d&hl={hl}&gl={gl}&ceid={ceid}"
+    elif RSS_TOPICS.get(category):
+        url = f"https://news.google.com/rss/headlines/section/topic/{RSS_TOPICS[category]}?hl={hl}&gl={gl}&ceid={ceid}"
+    else:
+        url = f"https://news.google.com/rss?hl={hl}&gl={gl}&ceid={ceid}"
+
+    feed = feedparser.parse(url)
+    raw = []
+    for entry in feed.entries[:limit]:
+        parts = entry.title.split(" - ")
+        title = parts[0].strip()
+        source_name = parts[-1].strip() if len(parts) > 1 else "Google News"
+        clean_summary = strip_html(entry.get("summary", ""))
+        raw.append({
+            "title": title,
+            "description": clean_summary,
+            "content": clean_summary,
+            "url": entry.link,
+            "urlToImage": None,
+            "publishedAt": entry.get("published", ""),
+            "source": {"name": source_name},
+        })
+    return raw
+
+# ── Core endpoints ───────────────────────────────────────────
 @app.get("/")
 def root():
     is_openrouter = ANTHROPIC_API_KEY.startswith("sk-or-")
     return {
         "app": "DigitalLens API",
-        "version": "4.0.0",
+        "version": "4.1.0",
         "status": "ok",
+        "news_source": "google-rss (free) + newsapi fallback",
         "ai_enabled": bool(ANTHROPIC_API_KEY and _ANTHROPIC_AVAILABLE),
         "ai_provider": "OpenRouter" if is_openrouter else "Anthropic",
     }
 
 @app.get("/health")
 def health():
-    return {"status": "healthy", "news_api": bool(NEWS_API_KEY), "claude": bool(ANTHROPIC_API_KEY and _ANTHROPIC_AVAILABLE), "cached_articles": len(all_articles())}
+    return {
+        "status": "healthy",
+        "news_rss": True,
+        "news_api": bool(NEWS_API_KEY),
+        "claude": bool(ANTHROPIC_API_KEY and _ANTHROPIC_AVAILABLE),
+        "cached_articles": len(all_articles()),
+    }
 
 @app.get("/categories")
 def get_categories():
-    return {"categories": ["general","technology","business","sports","health","science","entertainment"]}
+    return {"categories": ["general", "technology", "business", "sports", "health", "science", "entertainment"]}
 
 @app.get("/news")
 def get_news(
-    category: str = Query(default="general", enum=["general","technology","business","sports","health","science","entertainment"]),
+    category: str = Query(default="general", enum=["general", "technology", "business", "sports", "health", "science", "entertainment"]),
     q: Optional[str] = Query(default=None),
-    limit: int = Query(default=15, ge=1, le=20),
+    limit: int = Query(default=12, ge=1, le=50),
+    offset: int = Query(default=0, ge=0),
+    lang: str = Query(default="en"),
 ):
-    if not NEWS_API_KEY:
-        raise HTTPException(503, "NEWS_API_KEY not configured.")
-    key = f"news:{category}:{q}:{limit}"
-    cached = cache_get(key)
-    if cached:
-        return {"source": "cache", "articles": cached}
-    params = {"apiKey": NEWS_API_KEY, "language": "en", "pageSize": limit}
-    if q:
-        params["q"] = q
-        url = "https://newsapi.org/v2/everything"
-    else:
-        params["category"] = category
-        url = "https://newsapi.org/v2/top-headlines"
-    try:
-        resp = requests.get(url, params=params, timeout=12)
-    except Exception as e:
-        raise HTTPException(502, str(e))
-    if resp.status_code == 401:
-        raise HTTPException(401, "Invalid NEWS_API_KEY.")
-    if resp.status_code != 200:
-        raise HTTPException(502, f"NewsAPI error {resp.status_code}")
-    raw = [a for a in resp.json().get("articles", []) if a.get("description")]
-    processed = build_articles(raw, category)
-    cache_set(key, processed)
-    return {"source": "live", "articles": processed}
+    key = f"news:{category}:{q}:{lang}"
+    processed = cache_get(key)
+    source = "cache"
+
+    if not processed:
+        raw = []
+        try:
+            raw = fetch_rss(category, q, 100, lang)   # fetch full feed once
+        except Exception:
+            raw = []
+
+        if not raw and NEWS_API_KEY and lang == "en":
+            params = {"apiKey": NEWS_API_KEY, "language": "en", "pageSize": 100}
+            if q:
+                params["q"] = q
+                url = "https://newsapi.org/v2/everything"
+            else:
+                params["category"] = category
+                url = "https://newsapi.org/v2/top-headlines"
+            try:
+                resp = requests.get(url, params=params, timeout=12)
+                if resp.status_code == 200:
+                    raw = [a for a in resp.json().get("articles", []) if a.get("description")]
+            except Exception:
+                pass
+
+        if not raw:
+            raise HTTPException(502, "Could not fetch news from any source.")
+
+        processed = build_articles(raw, category)
+        cache_set(key, processed)
+        source = "live"
+
+    page = processed[offset:offset + limit]
+    return {
+        "source": source,
+        "articles": page,
+        "total": len(processed),
+        "has_more": offset + limit < len(processed),
+    }
 
 @app.get("/trending")
 def get_trending():
@@ -177,20 +284,29 @@ def get_trending():
     for a in articles:
         for t in (a.get("tags") or []):
             tags[t] = tags.get(t, 0) + 1
-    return {"trending_tags": [t for t,_ in sorted(tags.items(), key=lambda x:-x[1])[:12]], "total_articles": len(articles)}
+    return {
+        "trending_tags": [t for t, _ in sorted(tags.items(), key=lambda x: -x[1])[:12]],
+        "total_articles": len(articles),
+    }
 
 @app.get("/pulse")
 def get_pulse():
     articles = all_articles()
     if not articles:
         return {"message": "No articles cached yet.", "counts": {}, "overall": "neutral"}
-    counts = {"positive":0,"neutral":0,"negative":0}
+    counts = {"positive": 0, "neutral": 0, "negative": 0}
     for a in articles:
-        m = a.get("sentiment",{}).get("mood","neutral")
-        counts[m] = counts.get(m,0) + 1
+        m = a.get("sentiment", {}).get("mood", "neutral")
+        counts[m] = counts.get(m, 0) + 1
     total = len(articles)
-    return {"total": total, "counts": counts, "percentages": {k: round(v/total*100,1) for k,v in counts.items()}, "overall_mood": max(counts, key=lambda k: counts[k])}
+    return {
+        "total": total,
+        "counts": counts,
+        "percentages": {k: round(v / total * 100, 1) for k, v in counts.items()},
+        "overall_mood": max(counts, key=lambda k: counts[k]),
+    }
 
+# ── AI endpoints ─────────────────────────────────────────────
 class ChatRequest(BaseModel):
     message: str
     history: Optional[List[dict]] = []
@@ -198,15 +314,15 @@ class ChatRequest(BaseModel):
 def rule_chat(msg):
     msg_l = msg.lower()
     articles = all_articles()
-    if any(k in msg_l for k in ["summarise","summarize","today","headlines"]):
+    if any(k in msg_l for k in ["summarise", "summarize", "today", "headlines"]):
         if not articles:
             return "No articles cached yet. Browse a category first!"
         return "Latest:\n\n" + "\n".join(f"- {a['title']} ({a['source']})" for a in articles[:5])
-    if any(k in msg_l for k in ["positive","good news"]):
-        pos = [a for a in articles if a.get("sentiment",{}).get("mood")=="positive"][:4]
+    if any(k in msg_l for k in ["positive", "good news"]):
+        pos = [a for a in articles if a.get("sentiment", {}).get("mood") == "positive"][:4]
         return "Positive:\n\n" + "\n".join(f"- {a['title']}" for a in pos) if pos else "None cached."
-    if any(k in msg_l for k in ["negative","bad news","crisis"]):
-        neg = [a for a in articles if a.get("sentiment",{}).get("mood")=="negative"][:4]
+    if any(k in msg_l for k in ["negative", "bad news", "crisis"]):
+        neg = [a for a in articles if a.get("sentiment", {}).get("mood") == "negative"][:4]
         return "Concerning:\n\n" + "\n".join(f"- {a['title']}" for a in neg) if neg else "None cached."
     return "Browse a category first, then ask me about the news!"
 
@@ -218,10 +334,11 @@ async def chat(req: ChatRequest):
     articles = all_articles()
     ctx = ""
     if articles:
-        ctx = "\n\nLoaded articles:\n" + "\n".join(f"- {a['title']} | {a['source']} | {a['sentiment']['mood']}" for a in articles[:20])
+        ctx = "\n\nLoaded articles:\n" + "\n".join(
+            f"- {a['title']} | {a['source']} | {a['sentiment']['mood']}" for a in articles[:20])
     messages = []
     for h in (req.history or [])[-6:]:
-        if h.get("role") in ("user","assistant") and h.get("content"):
+        if h.get("role") in ("user", "assistant") and h.get("content"):
             messages.append({"role": h["role"], "content": h["content"]})
     messages.append({"role": "user", "content": req.message})
     try:
@@ -235,14 +352,15 @@ async def chat(req: ChatRequest):
         return {"reply": f"Error: {str(e)[:80]}"}
 
 class DigestRequest(BaseModel):
-    interests: List[str] = ["general","technology"]
+    interests: List[str] = ["general", "technology"]
 
 @app.post("/digest")
 async def digest(req: DigestRequest):
     articles = all_articles()
     if not articles:
         return {"digest": "Browse some categories first, then generate!"}
-    relevant = [a for a in articles if any(i.lower() in (a.get("title","")+" "+a.get("summary","")).lower() for i in req.interests)] or articles[:12]
+    relevant = [a for a in articles if any(
+        i.lower() in (a.get("title", "") + " " + a.get("summary", "")).lower() for i in req.interests)] or articles[:12]
     client = _claude()
     if not client:
         return {"digest": "Daily Briefing:\n\n" + "\n".join(f"- {a['title']} ({a['source']})" for a in relevant[:6])}
@@ -251,7 +369,7 @@ async def digest(req: DigestRequest):
         resp = client.messages.create(
             model="claude-sonnet-4-5", max_tokens=900,
             system="You are a professional news digest writer. Write a concise 3-paragraph daily briefing.",
-            messages=[{"role":"user","content":f"Interests: {', '.join(req.interests)}\n\nArticles:\n{articles_str}"}],
+            messages=[{"role": "user", "content": f"Interests: {', '.join(req.interests)}\n\nArticles:\n{articles_str}"}],
         )
         return {"digest": resp.content[0].text}
     except Exception as e:
@@ -268,12 +386,12 @@ class AnalyzeRequest(BaseModel):
 async def analyze(req: AnalyzeRequest):
     client = _claude()
     if not client:
-        return {"analysis": f"Sentiment: {req.sentiment.get('mood')} ({round(req.sentiment.get('score',0.5)*100)}%)\nSource: {req.source}"}
+        return {"analysis": f"Sentiment: {req.sentiment.get('mood')} ({round(req.sentiment.get('score', 0.5) * 100)}%)\nSource: {req.source}"}
     try:
         resp = client.messages.create(
             model="claude-sonnet-4-5", max_tokens=400,
             system="You are a senior news analyst. Be precise and insightful.",
-            messages=[{"role":"user","content":f"Title: {req.title}\nSource: {req.source}\nSummary: {req.summary}\nSentiment: {req.sentiment.get('mood')} ({round(req.sentiment.get('score',0.5)*100)}%)\nTags: {', '.join(req.tags)}\n\nFormat:\n**Key Takeaway:** (1 sentence)\n**Why It Matters:** (2-3 sentences)\n**Sentiment Context:** (why this rating)\n**Watch For:** (1 follow-up)\nUnder 200 words."}],
+            messages=[{"role": "user", "content": f"Title: {req.title}\nSource: {req.source}\nSummary: {req.summary}\nSentiment: {req.sentiment.get('mood')} ({round(req.sentiment.get('score', 0.5) * 100)}%)\nTags: {', '.join(req.tags)}\n\nFormat:\nKey Takeaway: (1 sentence)\nWhy It Matters: (2-3 sentences)\nSentiment Context: (why this rating)\nWatch For: (1 follow-up)\nUnder 200 words."}],
         )
         return {"analysis": resp.content[0].text}
     except Exception as e:
@@ -292,7 +410,7 @@ async def translate(req: TranslateRequest):
         resp = client.messages.create(
             model="claude-sonnet-4-5", max_tokens=1000,
             system=f"Translate to {req.target_lang}. Return ONLY the translation.",
-            messages=[{"role":"user","content":req.text}],
+            messages=[{"role": "user", "content": req.text}],
         )
         return {"translated": resp.content[0].text}
     except Exception as e:
@@ -307,16 +425,16 @@ async def tldr(req: TLDRRequest):
     client = _claude()
     if not client:
         words = req.summary.split()
-        return {"tldr": " ".join(words[:18]) + ("..." if len(words)>18 else "")}
+        return {"tldr": " ".join(words[:18]) + ("..." if len(words) > 18 else "")}
     try:
         resp = client.messages.create(
             model="claude-sonnet-4-5", max_tokens=80,
             system="Summarise news in ONE sentence under 20 words.",
-            messages=[{"role":"user","content":f"Title: {req.title}\nSummary: {req.summary}"}],
+            messages=[{"role": "user", "content": f"Title: {req.title}\nSummary: {req.summary}"}],
         )
         return {"tldr": resp.content[0].text.strip()}
     except Exception:
-        return {"tldr": req.summary[:120]+"..."}
+        return {"tldr": req.summary[:120] + "..."}
 
 class QuizRequest(BaseModel):
     num_questions: int = 4
@@ -332,27 +450,33 @@ async def quiz(req: QuizRequest):
         resp = client.messages.create(
             model="claude-sonnet-4-5", max_tokens=1200,
             system="You are a news quiz generator. Return only valid JSON arrays, no markdown.",
-            messages=[{"role":"user","content":f"Generate {min(req.num_questions,5)} MCQ questions from:\n{headlines}\n\nReturn ONLY JSON: [{{\"question\":\"...\",\"options\":[\"A)...\",\"B)...\",\"C)...\",\"D)...\"],\"answer\":\"A\",\"explanation\":\"...\"}}]"}],
+            messages=[{"role": "user", "content": f"Generate {min(req.num_questions, 5)} MCQ questions from:\n{headlines}\n\nReturn ONLY JSON: [{{\"question\": \"...\", \"options\": [\"A) ...\", \"B) ...\", \"C) ...\", \"D) ...\"], \"answer\": \"A\", \"explanation\": \"...\"}}]"}],
         )
-        text = re.sub(r"```json|```","",resp.content[0].text).strip()
+        text = re.sub(r"```json|```", "", resp.content[0].text).strip()
         return {"quiz": json.loads(text)}
     except Exception as e:
         return {"quiz": [], "error": str(e)[:100]}
 
 class CompareRequest(BaseModel):
-    categories: List[str] = ["technology","business"]
+    categories: List[str] = ["technology", "business"]
 
 @app.post("/compare")
 async def compare(req: CompareRequest):
     result = {}
     for cat in req.categories[:4]:
-        cached = cache_get(f"news:{cat}:None:15")
-        if cached:
-            counts = {"positive":0,"neutral":0,"negative":0}
-            for a in cached:
-                m = a.get("sentiment",{}).get("mood","neutral")
-                counts[m] = counts.get(m,0)+1
-            result[cat] = {"articles": len(cached), "sentiment": counts}
-        else:
-            result[cat] = {"articles": 0, "note": "Browse this category first."}
+        counts = {"positive": 0, "neutral": 0, "negative": 0}
+        total = 0
+        for key, entry in _cache.items():
+            if not key.startswith(f"news:{cat}:"):
+                continue
+            for a in (entry[1] or []):
+                m = a.get("sentiment", {}).get("mood", "neutral")
+                counts[m] = counts.get(m, 0) + 1
+                total += 1
+        result[cat] = {"articles": total, "sentiment": counts} if total else {"articles": 0, "note": "Browse this category first."}
     return {"comparison": result}
+
+# ── ✅ Routers registered AFTER app creation (fixes the crash) ──
+app.include_router(irus.router)
+app.include_router(free_news.router)
+app.include_router(admin.router)

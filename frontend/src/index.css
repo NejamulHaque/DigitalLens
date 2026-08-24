@@ -1,19 +1,52 @@
-/* index.css — reset only, no layout constraints that conflict with Dashboard */
-*, *::before, *::after {
-  box-sizing: border-box;
+/* =========================================
+   1. IMPORTS (MUST BE THE ABSOLUTE FIRST LINE)
+   ========================================= */
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=DM+Mono:wght@400;500&family=Manrope:wght@300;400;500;600;700&display=swap');
+/* Add any other @imports here if you have them */
+
+
+/* =========================================
+   2. TAILWIND DIRECTIVES (MUST COME IMMEDIATELY AFTER IMPORTS)
+   ========================================= */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+/* =========================================
+   3. ALL YOUR ORIGINAL CUSTOM CSS GOES HERE
+   ========================================= */
+:root {
+  /* Your original CSS variables go here */
+}
+
+* {
+  /* Your original reset styles go here */
 }
 
 body {
-  margin: 0;
-  padding: 0;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
+  /* Your original body styles go here */
 }
 
-#root {
-  /* FIXED: removed width:1126px and border-inline that was boxing in the dashboard */
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
+/* ... rest of your original CSS ... */
+
+html { scroll-behavior: smooth; }
+body { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+/* ━━━ UNIVERSAL MOBILE RESPONSIVE PACK ━━━ */
+html, body { overflow-x: hidden; }
+@media (max-width: 640px) {
+  .auth-card { padding: 24px 18px; }
+  .auth-stats { gap: 18px; }
+  .auth-headline { font-size: 30px; }
+  .auth-ticker { max-width: 100%; }
+  .svc-section { padding: 80px 16px; }
+  .svc-h2 { font-size: 30px; }
+  .ad-main { padding: 18px 12px; }
+  .ad-row input { min-width: 100%; }
+  .ad-nav { padding: 12px 14px; }
+}
+@media (max-width: 380px) {
+  .auth-logo-name { font-size: 22px; }
+  .mode-btn { font-size: 12px; }
+  .auth-cta, .auth-google { padding: 12px; font-size: 13px; }
 }
