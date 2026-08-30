@@ -18,23 +18,14 @@ const STATS = [
 
 const TICKER = ["AI reshapes global markets", "Markets rally on tech gains", "Science breakthrough announced", "Sports finals set records", "Health study published"];
 
-function friendlyError(code) {
-  const map = {
-    "auth/email-already-in-use": "This email is already registered — use Sign In instead.",
-    "auth/invalid-credential": "Wrong email or password. Try again.",
-    "auth/user-not-found": "No account found — create one below.",
-    "auth/wrong-password": "Wrong password. Try again.",
-    "auth/weak-password": "Password must be at least 6 characters.",
-    "auth/invalid-email": "That email address looks invalid.",
-    "auth/missing-password": "Please enter a password.",
-    "auth/operation-not-allowed": "Email/Password sign-in is DISABLED in Firebase Console → Authentication → Sign-in method.",
-    "auth/too-many-requests": "Too many attempts. Wait a minute and retry.",
-    "auth/network-request-failed": "Network error — check your connection.",
-    "auth/popup-closed-by-user": "Google popup was closed before finishing.",
-    "auth/popup-blocked": "Your browser blocked the popup — allow popups for this site.",
-    "auth/unauthorized-domain": "This domain isn't authorized in Firebase → Authentication → Settings → Authorized domains.",
-  };
-  return map[code] || `Something went wrong (${code || "unknown error"}).`;
+function friendlyError(msg) {
+  if (!msg) return "Authentication error. Please check your credentials.";
+  const text = String(msg);
+  if (text.includes("already registered") || text.includes("already-in-use")) return "This email is already registered — please Sign In.";
+  if (text.includes("Invalid email or password") || text.includes("invalid-credential") || text.includes("wrong-password")) return "Invalid email or password. Please try again.";
+  if (text.includes("at least 6 characters") || text.includes("weak-password")) return "Password must be at least 6 characters.";
+  if (text.includes("Invalid email") || text.includes("invalid-email")) return "Please enter a valid email address.";
+  return text;
 }
 
 export default function AuthPage() {
@@ -234,13 +225,6 @@ export default function AuthPage() {
                 {loading ? "Please wait…" : mode === "login" ? "Enter the Newsroom" : "Create Free Account"}
               </button>
             </form>
-
-            <div className="auth-div"><span>or continue with</span></div>
-
-            <button className="auth-google" onClick={google} disabled={loading}>
-              <svg width="17" height="17" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z"/><path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1A11 11 0 0 0 2.18 7.06l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38z"/></svg>
-              Continue with Google
-            </button>
 
             <p className="auth-swap">
               {mode === "login" ? "New to DigitalLens?" : "Already have an account?"}{" "}

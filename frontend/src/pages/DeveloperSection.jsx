@@ -24,8 +24,10 @@ const DeveloperSection = () => {
               <span>🛠️ React, Python, Claude</span>
             </div>
             <div className="dev-links">
-              <a href="https://github.com/NejamulHaque" target="_blank" rel="noreferrer">GitHub</a>
-              <a href="mailto:nejamulhaque05@gmail.com">Contact</a>
+              <a href="https://github.com/NejamulHaque" target="_blank" rel="noreferrer">GitHub ↗</a>
+              <a href="https://nejamulhaque.vercel.app/" target="_blank" rel="noreferrer">Portfolio ↗</a>
+              <a href="https://www.linkedin.com/in/nejamulhaque/" target="_blank" rel="noreferrer">LinkedIn ↗</a>
+              <a href="mailto:nejamulhaque.works@gmail.com">Contact</a>
             </div>
           </div>
 

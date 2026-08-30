@@ -1,3 +1,14 @@
+# Environment variables
+.env
+.env.*
+*.env
+*.env.*
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.local
+
 # Logs
 logs
 *.log
@@ -7,13 +18,12 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Node / Build
 node_modules
 dist
 dist-ssr
-# Environment variables
-.env
-.env.local
-*.local
+dev-dist
+.vite
 
 # Editor directories and files
 .vscode/*

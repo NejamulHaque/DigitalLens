@@ -94,9 +94,9 @@ a { color:inherit; }
 
 /* ━━ NAVIGATION ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 .npnav {
-  background:rgba(14,13,11,.92); backdrop-filter:blur(16px);
-  border-bottom:1px solid var(--wire); position:sticky; top:0; z-index:200;
-  padding:0 28px;
+  background: rgba(14,13,11,.96); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--wire); position: sticky; top: 0; z-index: 250;
+  padding: 0 28px; box-shadow: 0 4px 30px rgba(0, 0, 0, 0.45);
 }
 .npnav-inner { display:flex; align-items:center; gap:16px; height:58px; }
 
@@ -1226,6 +1226,8 @@ button:active { transform: scale(.96); }
 /* ━━━ V8 — MOBILE POLISH PACK ━━━ */
 * { -webkit-tap-highlight-color: transparent; }
 .admin-banner{background:linear-gradient(90deg,var(--gold-bg),transparent);border-bottom:1px solid rgba(200,164,90,.25);color:var(--gold);font-family:var(--font-mono);font-size:11px;padding:7px 16px;text-align:center;letter-spacing:.04em;}
+.admin-banner-urgent{background:linear-gradient(90deg,rgba(249,115,22,0.15),transparent);border-bottom:1px solid rgba(249,115,22,0.4);color:#fb923c;}
+.admin-banner-critical{background:linear-gradient(90deg,rgba(239,68,68,0.2),transparent);border-bottom:1px solid rgba(239,68,68,0.5);color:#f87171;font-weight:700;}
 
 @media (max-width:768px){
   .npnav{padding:0 14px;}

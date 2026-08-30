@@ -105,24 +105,6 @@ export default function AuthModal({ type, onClose, onSwitch }: AuthModalProps) {
           </div>
         )}
 
-        <button
-          onClick={handleGoogle}
-          disabled={busy !== null}
-          className="w-full flex items-center justify-center gap-3 px-6 py-3 bg-white rounded-xl font-semibold text-slate-900 hover:bg-white/90 transition-all hover:-translate-y-0.5 disabled:opacity-60 disabled:cursor-not-allowed mb-5"
-        >
-          {busy === "google" ? (
-            <div className="w-5 h-5 border-2 border-slate-300 border-t-slate-900 rounded-full animate-spin" />
-          ) : (
-            <FcGoogle className="w-5 h-5" />
-          )}
-          Continue with Google
-        </button>
-
-        <div className="relative mb-5">
-          <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10" /></div>
-          <div className="relative flex justify-center text-sm"><span className="px-4 bg-slate-900 text-white/40">or with email</span></div>
-        </div>
-
         <form onSubmit={handleSubmit} className="space-y-4">
           {type === "signup" && (
             <div className="relative">
