@@ -1393,7 +1393,7 @@ function DeveloperPanel({ onClose }) {
             <p className="dev-name">Nejamul Haque</p>
             <span className="dev-verified-chip">✓ Architect</span>
           </div>
-          <p className="dev-role-lbl">Full Stack AI Developer & Researcher</p>
+          <p className="dev-role-lbl">DevSecOps Engineer & Researcher</p>
           <div className="dev-badges">
             <span className="dev-badge">⚡ DigitalLens Creator</span>
             <span className="dev-badge">🧠 Neural NLP & LLMs</span>
