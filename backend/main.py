@@ -605,8 +605,9 @@ async def factcheck(req: FactCheckRequest):
         return {"fact_check": bias_data}
 
 # ── Register Routers ──────────────────────────────────────────
-from routers import auth
+from routers import auth, payments
 app.include_router(auth.router)
+app.include_router(payments.router)
 app.include_router(irus.router)
 app.include_router(free_news.router)
 app.include_router(admin.router)

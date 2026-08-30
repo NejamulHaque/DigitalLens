@@ -317,6 +317,18 @@ a { color:inherit; }
 
 /* ━━ LIST VIEW ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 .list-view { display:flex; flex-direction:column; gap:1px; background:var(--wire); border-radius:var(--radius-lg); overflow:hidden; }
+.user-btn { display:flex; align-items:center; gap:8px; background:none; border:none; cursor:pointer; padding:4px 8px; border-radius:8px; transition:background .15s; }
+.user-btn:hover { background:var(--glass); }
+.pro-badge-pill {
+  background: linear-gradient(135deg, #c8a45a, #e6c875);
+  color: #1a1500; font-size: 9px; font-weight: 800; font-family: var(--font-mono);
+  padding: 1.5px 5px; border-radius: 4px; letter-spacing: 0.05em; text-transform: uppercase;
+  box-shadow: 0 2px 8px rgba(200, 164, 90, 0.4);
+}
+.udd-role {
+  font-size: 9.5px; font-family: var(--font-mono); color: var(--gold);
+  text-transform: uppercase; letter-spacing: 0.08em; margin-top: 3px; display: block;
+}
 .list-card { display:flex; align-items:center; gap:14px; background:var(--ink2); padding:14px 18px; cursor:pointer; transition:background .2s; min-height:88px; }
 .list-card:hover { background:var(--ink3); }
 .list-card:first-child { border-radius:var(--radius-lg) var(--radius-lg) 0 0; }

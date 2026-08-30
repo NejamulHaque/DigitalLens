@@ -1095,11 +1095,18 @@ const installApp=async()=>{
                     :<span>{(profile?.displayName||user?.email||"?")[0].toUpperCase()}</span>}
                 </div>
                 <span className="user-name-label">{(profile?.displayName||"Me").split(" ")[0]}</span>
+                {(user?.role==="Pro Reader"||profile?.role==="Pro Reader"||user?.email==="nejamulhaque.works@gmail.com")&&(
+                  <span className="pro-badge-pill" title="Pro Intelligence Member">PRO</span>
+                )}
                 <span style={{fontSize:10,opacity:.6}}>▾</span>
               </button>
               {userMenu&&(
                 <div className="user-dd" onClick={e=>e.stopPropagation()}>
-                  <div className="udd-hdr"><p className="udd-name">{profile?.displayName||"Reader"}</p><p className="udd-email">{user?.email}</p></div>
+                  <div className="udd-hdr">
+                    <p className="udd-name">{profile?.displayName||"Reader"}</p>
+                    <p className="udd-email">{user?.email}</p>
+                    <span className="udd-role">{user?.role || profile?.role || (user?.email==="nejamulhaque.works@gmail.com" ? "Owner / Architect" : "Reader")}</span>
+                  </div>
                   {[["◈","Preferences",()=>{setShowPrefs(true);setUserMenu(false);}],
                     ["◎","History",()=>{setShowHist(true);setUserMenu(false);}],
                     ["◇","Saved",()=>{setShowSaved(true);setUserMenu(false);}],

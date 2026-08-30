@@ -5,7 +5,8 @@ import { useAuth } from "../context/AuthContext";
 import {
   FiActivity, FiUsers, FiGlobe, FiShield, FiRadio, FiCpu,
   FiRefreshCw, FiDownload, FiSearch, FiSliders, FiTrash2,
-  FiSend, FiCheck, FiAlertTriangle, FiMonitor, FiSmartphone, FiTablet, FiKey
+  FiSend, FiCheck, FiAlertTriangle, FiMonitor, FiSmartphone, FiTablet, FiKey,
+  FiCreditCard, FiCopy, FiDollarSign, FiCheckCircle, FiXCircle
 } from "react-icons/fi";
 import "./Admin.css";
 
@@ -41,6 +42,9 @@ export default function AdminPage() {
   });
 
   const [firestoreUsers, setFirestoreUsers] = useState([]);
+  const [payments, setPayments] = useState([]);
+  const [pendingPaymentsCount, setPendingPaymentsCount] = useState(0);
+  const [copiedUtr, setCopiedUtr] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [busy, setBusy] = useState("");
   const [toast, setToast] = useState("");
@@ -85,13 +89,51 @@ export default function AdminPage() {
     setBusy("");
   }, [timeframe]);
 
+  // Fetch Payments & Subscriptions
+  const loadPayments = useCallback(async () => {
+    try {
+      const res = await fetch(`${API}/api/payments/list`, { headers: authHeaders });
+      const data = await res.json();
+      if (data && data.payments) {
+        setPayments(data.payments);
+        setPendingPaymentsCount(data.pending_count || 0);
+      }
+    } catch {}
+  }, [authHeaders]);
+
+  const handlePaymentAction = async (paymentId, action) => {
+    setBusy(`pay_${paymentId}`);
+    try {
+      const res = await fetch(`${API}/api/payments/action`, {
+        method: "POST",
+        headers: authHeaders,
+        body: JSON.stringify({ payment_id: paymentId, action }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(`✓ Payment #${paymentId} was successfully ${action === "approve" ? "APPROVED (Account upgraded to Pro)" : "REJECTED"}.`);
+        loadPayments();
+        loadFirestoreUsers();
+      } else {
+        showToast(data.detail || "Action failed.");
+      }
+    } catch {
+      showToast("⚠️ Could not reach payment engine.");
+    }
+    setBusy("");
+  };
+
   useEffect(() => {
     if (isAuthorized) {
       loadAllData();
-      const interval = setInterval(loadAllData, 20000);
+      loadPayments();
+      const interval = setInterval(() => {
+        loadAllData();
+        loadPayments();
+      }, 20000);
       return () => clearInterval(interval);
     }
-  }, [isAuthorized, loadAllData]);
+  }, [isAuthorized, loadAllData, loadPayments]);
 
   // Fetch Neon DB Readers
   const loadFirestoreUsers = async () => {
@@ -322,6 +364,7 @@ export default function AdminPage() {
         {[
           { id: "telemetry", label: "📊 Visual Telemetry & Traffic", icon: FiActivity },
           { id: "visitors", label: "🛰️ Live Visitor & IP Explorer", icon: FiGlobe },
+          { id: "payments", label: `💳 Subscriptions & Payments${pendingPaymentsCount > 0 ? ` (${pendingPaymentsCount})` : ""}`, icon: FiCreditCard, alert: pendingPaymentsCount > 0 },
           { id: "users", label: "👥 Registered Readers", icon: FiUsers },
           { id: "broadcast", label: "📢 Global Broadcast", icon: FiRadio },
           { id: "system", label: "⚙️ Flags & Telemetry Health", icon: FiSliders },
@@ -331,11 +374,13 @@ export default function AdminPage() {
             onClick={() => {
               setActiveTab(t.id);
               if (t.id === "users" && firestoreUsers.length === 0) loadFirestoreUsers();
+              if (t.id === "payments") loadPayments();
             }}
             className={`adm-tab-btn ${activeTab === t.id ? "adm-tab-on" : ""}`}
           >
             <t.icon className="w-4 h-4" />
             <span>{t.label}</span>
+            {t.alert && <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse ml-1" />}
           </button>
         ))}
       </nav>
@@ -639,6 +684,186 @@ export default function AdminPage() {
               {filteredLogs.length === 0 && (
                 <div className="text-center py-12 text-slate-500 text-sm">
                   No visitor logs match your search query.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ═════════════════════════════════════════════════════════
+            TAB: SUBSCRIPTIONS & UPI PAYMENTS (₹49/mo)
+           ═════════════════════════════════════════════════════════ */}
+        {activeTab === "payments" && (
+          <div className="adm-panel space-y-6">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <h3 className="adm-panel-title">💳 Subscriptions & UPI Payments</h3>
+                <p className="adm-panel-sub">Verify ₹49 Pro subscriptions, inspect UTR reference numbers & approve reader upgrades</p>
+              </div>
+
+              <button
+                onClick={loadPayments}
+                disabled={busy === "payments"}
+                className="adm-btn-primary flex items-center gap-2"
+              >
+                <FiRefreshCw className={busy === "payments" ? "animate-spin" : ""} />
+                Refresh Payments
+              </button>
+            </div>
+
+            {/* Payments KPI Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="adm-stat-card adm-stat-amber">
+                <p className="adm-stat-lbl">Pending Review</p>
+                <div className="flex items-baseline gap-2">
+                  <h3 className="adm-stat-val text-amber-400">
+                    {payments.filter((p) => p.status === "pending").length}
+                  </h3>
+                  {payments.some((p) => p.status === "pending") && (
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse" />
+                  )}
+                </div>
+                <p className="adm-stat-foot">Requires owner action</p>
+              </div>
+
+              <div className="adm-stat-card adm-stat-emerald">
+                <p className="adm-stat-lbl">Approved Pro Members</p>
+                <h3 className="adm-stat-val text-emerald-400">
+                  {payments.filter((p) => p.status === "approved").length}
+                </h3>
+                <p className="adm-stat-foot">Active Pro accounts</p>
+              </div>
+
+              <div className="adm-stat-card adm-stat-blue">
+                <p className="adm-stat-lbl">Total Submissions</p>
+                <h3 className="adm-stat-val">{payments.length}</h3>
+                <p className="adm-stat-foot">Lifetime payment intents</p>
+              </div>
+
+              <div className="adm-stat-card adm-stat-purple">
+                <p className="adm-stat-lbl">Revenue Generated</p>
+                <h3 className="adm-stat-val text-purple-300">
+                  ₹{payments.filter((p) => p.status === "approved").length * 49}
+                </h3>
+                <p className="adm-stat-foot">Billed @ ₹49 / reader</p>
+              </div>
+            </div>
+
+            {/* Payments Table */}
+            <div className="adm-table-wrap">
+              <table className="adm-table">
+                <thead>
+                  <tr>
+                    <th>Reader</th>
+                    <th>Plan & Amount</th>
+                    <th>UPI Reference / UTR</th>
+                    <th>Date</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {payments.map((p) => (
+                    <tr key={p.id}>
+                      <td>
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-600 to-amber-500 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                            {(p.user_name || p.user_email || "?")[0].toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="text-xs font-bold text-white">{p.user_name || "Reader"}</p>
+                            <p className="text-[11px] text-slate-400 font-mono">{p.user_email}</p>
+                          </div>
+                        </div>
+                      </td>
+
+                      <td>
+                        <div className="text-xs">
+                          <span className="font-bold text-amber-400">{p.amount || "₹49"}</span>
+                          <span className="block text-[10px] text-slate-400 font-mono">{p.plan || "Pro Intelligence"}</span>
+                        </div>
+                      </td>
+
+                      <td>
+                        <div className="flex items-center gap-1.5">
+                          <code className="text-emerald-400 font-mono text-xs bg-slate-800/90 px-2 py-1 rounded border border-slate-700">
+                            {p.utr_number}
+                          </code>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard?.writeText(p.utr_number);
+                              setCopiedUtr(String(p.id));
+                              setTimeout(() => setCopiedUtr(""), 2000);
+                            }}
+                            className="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+                            title="Copy UTR Reference"
+                          >
+                            {copiedUtr === String(p.id) ? (
+                              <FiCheck className="w-3.5 h-3.5 text-emerald-400" />
+                            ) : (
+                              <FiCopy className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                        </div>
+                      </td>
+
+                      <td className="text-xs text-slate-400 font-mono">
+                        {p.created_at ? p.created_at.split("T")[0] : "Recent"}
+                      </td>
+
+                      <td>
+                        <span
+                          className={`px-2.5 py-1 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider ${
+                            p.status === "approved"
+                              ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                              : p.status === "rejected"
+                              ? "bg-rose-500/20 text-rose-300 border border-rose-500/40"
+                              : "bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse"
+                          }`}
+                        >
+                          {p.status}
+                        </span>
+                      </td>
+
+                      <td>
+                        {p.status === "pending" ? (
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handlePaymentAction(p.id, "approve")}
+                              disabled={busy === `pay_${p.id}`}
+                              className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-600/30 flex items-center gap-1 transition-all"
+                            >
+                              <FiCheckCircle className="w-3.5 h-3.5" />
+                              Approve Pro
+                            </button>
+                            <button
+                              onClick={() => handlePaymentAction(p.id, "reject")}
+                              disabled={busy === `pay_${p.id}`}
+                              className="px-2.5 py-1.5 rounded-lg bg-rose-600/30 hover:bg-rose-600/50 text-rose-300 font-semibold text-xs border border-rose-500/40 flex items-center gap-1 transition-all"
+                            >
+                              <FiXCircle className="w-3.5 h-3.5" />
+                              Reject
+                            </button>
+                          </div>
+                        ) : p.status === "approved" ? (
+                          <span className="text-xs text-emerald-400 font-medium flex items-center gap-1">
+                            <FiCheck className="w-3.5 h-3.5" /> Upgraded to Pro
+                          </span>
+                        ) : (
+                          <span className="text-xs text-rose-400 font-medium">
+                            Declined
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              {payments.length === 0 && (
+                <div className="text-center py-12 text-slate-500 text-sm">
+                  No payment submissions yet. New ₹49 UPI subscriptions will appear here automatically.
                 </div>
               )}
             </div>

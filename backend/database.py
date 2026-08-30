@@ -131,6 +131,22 @@ def init_db():
                     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
                 );
                 """)
+                # Subscriptions & Payments Table
+                cur.execute("""
+                CREATE TABLE IF NOT EXISTS payments (
+                    id SERIAL PRIMARY KEY,
+                    user_email VARCHAR(128) NOT NULL,
+                    user_name VARCHAR(128),
+                    plan VARCHAR(64) DEFAULT 'Pro Intelligence',
+                    amount VARCHAR(32) DEFAULT '₹49',
+                    currency VARCHAR(8) DEFAULT 'INR',
+                    utr_number VARCHAR(128) NOT NULL,
+                    status VARCHAR(32) DEFAULT 'pending',
+                    notes TEXT,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                );
+                """)
             print("[Database] Neon PostgreSQL schema verified.")
         else:
             with conn:
@@ -203,6 +219,21 @@ def init_db():
                     flags TEXT DEFAULT '{}',
                     is_active INTEGER DEFAULT 1,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                """)
+                conn.execute("""
+                CREATE TABLE IF NOT EXISTS payments (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_email TEXT NOT NULL,
+                    user_name TEXT,
+                    plan TEXT DEFAULT 'Pro Intelligence',
+                    amount TEXT DEFAULT '₹49',
+                    currency TEXT DEFAULT 'INR',
+                    utr_number TEXT NOT NULL,
+                    status TEXT DEFAULT 'pending',
+                    notes TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
                 """)
             print(f"[Database] SQLite schema verified at {SQLITE_PATH}.")
@@ -426,3 +457,105 @@ def get_broadcast():
     except Exception as e:
         print(f"[Database] get_broadcast error: {e}")
     return {"text": "", "priority": "info", "flags": {}}
+
+# ── Subscriptions & Payments Helpers ──
+def create_payment(user_email: str, user_name: str, plan: str, amount: str, utr_number: str, notes: str = "") -> dict:
+    email_clean = user_email.strip().lower()
+    conn = get_connection()
+    try:
+        if DB_TYPE == "neon_postgres":
+            with conn.cursor() as cur:
+                cur.execute("""
+                INSERT INTO payments (user_email, user_name, plan, amount, currency, utr_number, status, notes)
+                VALUES (%s, %s, %s, %s, %s, %s, 'pending', %s)
+                RETURNING id, user_email, user_name, plan, amount, currency, utr_number, status, notes, created_at;
+                """, (email_clean, user_name.strip(), plan, amount, "INR", utr_number.strip(), notes.strip()))
+                row = cur.fetchone()
+                return {
+                    "id": row[0], "user_email": row[1], "user_name": row[2],
+                    "plan": row[3], "amount": row[4], "currency": row[5],
+                    "utr_number": row[6], "status": row[7], "notes": row[8],
+                    "created_at": str(row[9])
+                }
+        else:
+            with conn:
+                cur = conn.cursor()
+                cur.execute("""
+                INSERT INTO payments (user_email, user_name, plan, amount, currency, utr_number, status, notes)
+                VALUES (?, ?, ?, ?, ?, ?, 'pending', ?);
+                """, (email_clean, user_name.strip(), plan, amount, "INR", utr_number.strip(), notes.strip()))
+                pay_id = cur.lastrowid
+                return {
+                    "id": pay_id, "user_email": email_clean, "user_name": user_name.strip(),
+                    "plan": plan, "amount": amount, "currency": "INR",
+                    "utr_number": utr_number.strip(), "status": "pending", "notes": notes.strip(),
+                    "created_at": datetime.now(timezone.utc).isoformat()
+                }
+    except Exception as e:
+        print(f"[Database] create_payment error: {e}")
+        raise e
+
+def get_all_payments() -> list:
+    conn = get_connection()
+    try:
+        if DB_TYPE == "neon_postgres":
+            with conn.cursor() as cur:
+                cur.execute("""
+                SELECT id, user_email, user_name, plan, amount, currency, utr_number, status, notes, created_at, updated_at
+                FROM payments ORDER BY id DESC;
+                """)
+                rows = cur.fetchall()
+                return [{
+                    "id": r[0], "user_email": r[1], "user_name": r[2], "plan": r[3],
+                    "amount": r[4], "currency": r[5], "utr_number": r[6], "status": r[7],
+                    "notes": r[8], "created_at": str(r[9]), "updated_at": str(r[10])
+                } for r in rows]
+        else:
+            cur = conn.cursor()
+            cur.execute("""
+            SELECT id, user_email, user_name, plan, amount, currency, utr_number, status, notes, created_at, updated_at
+            FROM payments ORDER BY id DESC;
+            """)
+            rows = cur.fetchall()
+            return [{
+                "id": r["id"], "user_email": r["user_email"], "user_name": r["user_name"], "plan": r["plan"],
+                "amount": r["amount"], "currency": r["currency"], "utr_number": r["utr_number"], "status": r["status"],
+                "notes": r["notes"], "created_at": str(r["created_at"]), "updated_at": str(r["updated_at"])
+            } for r in rows]
+    except Exception as e:
+        print(f"[Database] get_all_payments error: {e}")
+        return []
+
+def update_payment_status(payment_id: int, status: str) -> dict:
+    valid_statuses = ["pending", "approved", "rejected"]
+    status_clean = status.strip().lower()
+    if status_clean not in valid_statuses:
+        raise ValueError(f"Invalid status: {status}")
+    
+    conn = get_connection()
+    try:
+        user_email = None
+        if DB_TYPE == "neon_postgres":
+            with conn.cursor() as cur:
+                cur.execute("SELECT user_email FROM payments WHERE id = %s;", (payment_id,))
+                row = cur.fetchone()
+                if row:
+                    user_email = row[0]
+                cur.execute("UPDATE payments SET status = %s, updated_at = NOW() WHERE id = %s;", (status_clean, payment_id))
+                if status_clean == "approved" and user_email:
+                    cur.execute("UPDATE user_accounts SET role = 'Pro Reader' WHERE email = %s;", (user_email,))
+        else:
+            with conn:
+                cur = conn.cursor()
+                cur.execute("SELECT user_email FROM payments WHERE id = ?;", (payment_id,))
+                row = cur.fetchone()
+                if row:
+                    user_email = row["user_email"]
+                conn.execute("UPDATE payments SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?;", (status_clean, payment_id))
+                if status_clean == "approved" and user_email:
+                    conn.execute("UPDATE user_accounts SET role = 'Pro Reader' WHERE email = ?;", (user_email,))
+        return {"ok": True, "payment_id": payment_id, "status": status_clean, "user_email": user_email}
+    except Exception as e:
+        print(f"[Database] update_payment_status error: {e}")
+        return {"ok": False, "error": str(e)}
+

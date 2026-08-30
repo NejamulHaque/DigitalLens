@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { FiCheck, FiZap } from "react-icons/fi";
+import PaymentModal from "./PaymentModal";
 
 const TIERS = [
   {
@@ -23,12 +25,12 @@ const TIERS = [
   {
     name: "Pro Intelligence",
     tagline: "Power users, researchers & journalists",
-    price: "$0",
-    period: "Early Adopter Free Access",
+    price: "₹49",
+    period: "per month (Billed via UPI)",
     featured: true,
     badge: "Most Popular",
-    cta: "Launch Pro Experience →",
-    link: "/app",
+    cta: "Upgrade to Pro — ₹49/mo →",
+    link: "payment_modal",
     features: [
       "Everything in Explorer",
       "Claude 3.5 Sonnet Deep Newsroom Takeaways",
@@ -60,8 +62,11 @@ const TIERS = [
 ];
 
 export default function PricingTiers() {
+  const [isPayOpen, setIsPayOpen] = useState(false);
+
   return (
     <section className="py-24 bg-slate-950 relative" id="pricing">
+      <PaymentModal isOpen={isPayOpen} onClose={() => setIsPayOpen(false)} />
       <div className="max-w-7xl mx-auto px-6">
         <motion.div
           className="text-center max-w-3xl mx-auto mb-16"
@@ -121,7 +126,15 @@ export default function PricingTiers() {
               </div>
 
               <div className="mt-8 pt-4">
-                {tier.link.startsWith("#") ? (
+                {tier.link === "payment_modal" ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsPayOpen(true)}
+                    className="block w-full py-3.5 px-6 rounded-xl font-semibold text-sm text-center bg-gradient-to-r from-purple-600 via-indigo-600 to-amber-500 hover:from-purple-500 hover:to-amber-400 text-white shadow-lg shadow-purple-500/30 transition-all cursor-pointer"
+                  >
+                    {tier.cta}
+                  </button>
+                ) : tier.link.startsWith("#") ? (
                   <a
                     href={tier.link}
                     className="block w-full py-3.5 px-6 rounded-xl font-semibold text-sm text-center bg-white/10 hover:bg-white/20 text-white transition-all"
@@ -131,11 +144,7 @@ export default function PricingTiers() {
                 ) : (
                   <Link
                     to={tier.link}
-                    className={`block w-full py-3.5 px-6 rounded-xl font-semibold text-sm text-center transition-all ${
-                      tier.featured
-                        ? "bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white shadow-lg shadow-purple-500/30"
-                        : "bg-white/10 hover:bg-white/20 text-white"
-                    }`}
+                    className="block w-full py-3.5 px-6 rounded-xl font-semibold text-sm text-center bg-white/10 hover:bg-white/20 text-white transition-all"
                   >
                     {tier.cta}
                   </Link>
