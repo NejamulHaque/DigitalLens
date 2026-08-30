@@ -1331,56 +1331,102 @@ function UPIQRCode({ upiId }) {
 }
 function DeveloperPanel({ onClose }) {
   const [copied, setCopied] = useState(false);
-  const upi = "nejamulhaque@freecharge";
+  const upi = "nejamulhaque@upi";
   const copyUPI = () => {
-    navigator.clipboard.writeText(upi)
-      .then(() => { setCopied(true); setTimeout(() => setCopied(false), 2200); })
+    navigator.clipboard
+      .writeText(upi)
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2200);
+      })
       .catch(() => {});
   };
-  const skills = [
-    { icon: "⬡", label: "React", level: 95 },
-    { icon: "◈", label: "Python / FastAPI", level: 90 },
-    { icon: "◉", label: "Claude AI / LLMs", level: 88 },
-    { icon: "🐘", label: "Neon PostgreSQL", level: 92 },
-    { icon: "◆", label: "Node.js", level: 78 },
+
+  const techStack = [
+    { label: "React 18", icon: "⚛️", cat: "Frontend" },
+    { label: "FastAPI / Python", icon: "⚡", cat: "Backend" },
+    { label: "Claude Sonnet 4.5", icon: "🧠", cat: "AI Engine" },
+    { label: "Neon PostgreSQL", icon: "🐘", cat: "Database" },
+    { label: "TypeScript", icon: "🔷", cat: "Language" },
+    { label: "Tailwind CSS", icon: "🎨", cat: "Styling" },
+    { label: "Irus AI Copilot", icon: "◉", cat: "Search & Web" },
+    { label: "PWA Offline Cache", icon: "📱", cat: "Architecture" },
   ];
+
   const socials = [
-    { icon: "⬡", label: "GitHub", url: "https://github.com/NejamulHaque", sub: "@NejamulHaque" },
-    { icon: "⬡", label: "Portfolio", url: "https://nejamulhaque.vercel.app/", sub: "@NejamulHaque" },
-    { icon: "✉", label: "Email", url: "mailto:nejamulhaque05@gmail.com", sub: "nejamulhaque05@gmail.com" },
+    {
+      icon: "🐙",
+      label: "GitHub Profile",
+      url: "https://github.com/NejamulHaque",
+      sub: "@NejamulHaque",
+    },
+    {
+      icon: "⭐",
+      label: "DigitalLens Repository",
+      url: "https://github.com/NejamulHaque/DigitalLens",
+      sub: "Source Code & Documentation",
+    },
+    {
+      icon: "🌐",
+      label: "Live Portfolio",
+      url: "https://nejamulhaque.vercel.app/",
+      sub: "nejamulhaque.vercel.app",
+    },
+    {
+      icon: "✉️",
+      label: "Work Email",
+      url: "mailto:nejamulhaque.works@gmail.com",
+      sub: "nejamulhaque.works@gmail.com",
+    },
   ];
+
   return (
-    <SidePanel title="</> Developer" onClose={onClose}>
+    <SidePanel title="</> Lead Architect & Developer" onClose={onClose}>
+      {/* Profile Header */}
       <div className="dev-hero">
         <div className="dev-avi-wrap">
           <div className="dev-avi">NH</div>
-          <div className="dev-avi-ring"/>
+          <div className="dev-avi-ring" />
         </div>
         <div className="dev-hero-text">
-          <p className="dev-name">Nejamul Haque</p>
-          <p className="dev-role-lbl">Full Stack AI Developer &amp; Researcher</p>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <p className="dev-name">Nejamul Haque</p>
+            <span className="dev-verified-chip">✓ Architect</span>
+          </div>
+          <p className="dev-role-lbl">Full Stack AI Developer & Researcher</p>
           <div className="dev-badges">
-            <span className="dev-badge">◉ 3+ Years</span>
-            <span className="dev-badge">⬡ AI Specialist</span>
+            <span className="dev-badge">⚡ DigitalLens Creator</span>
+            <span className="dev-badge">🧠 Neural NLP & LLMs</span>
           </div>
         </div>
       </div>
-      <p className="dev-bio">Passionate about building intelligent systems that bridge complex AI and user-friendly interfaces. Creator of DigitalLens.</p>
-      <p className="dev-sec-lbl">Skills</p>
-      <div className="dev-skills">
-        {skills.map(s => (
-          <div key={s.label} className="dev-skill-row">
-            <span className="dev-sk-icon">{s.icon}</span>
-            <span className="dev-sk-lbl">{s.label}</span>
-            <div className="dev-sk-bar-bg"><div className="dev-sk-bar-fill" style={{width:`${s.level}%`}}/></div>
-            <span className="dev-sk-pct">{s.level}%</span>
+
+      <p className="dev-bio">
+        Passionate about building state-of-the-art AI systems that synthesize global media into unbiased, real-time intelligence.
+      </p>
+
+      {/* Tech Stack Grid */}
+      <p className="dev-sec-lbl">Architecture & Tech Stack</p>
+      <div className="dev-tech-grid">
+        {techStack.map((t) => (
+          <div key={t.label} className="dev-tech-chip">
+            <span className="dev-tc-icon">{t.icon}</span>
+            <span className="dev-tc-label">{t.label}</span>
           </div>
         ))}
       </div>
-      <p className="dev-sec-lbl">Connect</p>
+
+      {/* Connect & Socials */}
+      <p className="dev-sec-lbl">Connect & Source Repositories</p>
       <div className="dev-socials">
-        {socials.map(s => (
-          <a key={s.label} href={s.url} target="_blank" rel="noreferrer" className="dev-social-card">
+        {socials.map((s) => (
+          <a
+            key={s.label}
+            href={s.url}
+            target="_blank"
+            rel="noreferrer"
+            className="dev-social-card"
+          >
             <span className="dev-sc-icon">{s.icon}</span>
             <div className="dev-sc-text">
               <p className="dev-sc-label">{s.label}</p>
@@ -1390,27 +1436,38 @@ function DeveloperPanel({ onClose }) {
           </a>
         ))}
       </div>
-      <p className="dev-sec-lbl">Support the Project</p>
+
+      {/* Support / Sponsor */}
+      <p className="dev-sec-lbl">Support Open Source Development</p>
       <div className="dev-support-card">
         <div className="dev-qr-side">
-          <UPIQRCode upiId={upi}/>
-          <p className="dev-qr-caption">Scan with any UPI app</p>
+          <UPIQRCode upiId={upi} />
+          <p className="dev-qr-caption">Scan with GPay, PhonePe, Paytm, BHIM</p>
         </div>
         <div className="dev-upi-side">
-          <p className="dev-coffee-title">Buy me a coffee ☕</p>
-          <p className="dev-coffee-desc">Your support keeps DigitalLens independent, ad-free, and actively developed.</p>
+          <p className="dev-coffee-title">Support DigitalLens ☕</p>
+          <p className="dev-coffee-desc">
+            Your contributions power real-time cloud compute, neural AI summarization, and keep DigitalLens ad-free.
+          </p>
           <div className="dev-upi-pill">
             <span className="dev-upi-text">{upi}</span>
-            <button className={`dev-copy-btn${copied ? " dev-copy-ok" : ""}`} onClick={copyUPI}>
-              {copied ? "✓ Copied" : "Copy"}
+            <button
+              className={`dev-copy-btn${copied ? " dev-copy-ok" : ""}`}
+              onClick={copyUPI}
+            >
+              {copied ? "✓ Copied" : "Copy UPI"}
             </button>
           </div>
           <div className="dev-app-tags">
-            {["GPay","PhonePe","Paytm","BHIM"].map(a => (<span key={a} className="dev-app-tag">{a}</span>))}
+            {["GPay", "PhonePe", "Paytm", "BHIM"].map((a) => (
+              <span key={a} className="dev-app-tag">
+                {a}
+              </span>
+            ))}
           </div>
         </div>
       </div>
-      <p className="dev-footer-note">Thank you for supporting open-source AI development ◈</p>
+      <p className="dev-footer-note">Crafted with precision by Nejamul Haque · 2026 ◈</p>
     </SidePanel>
   );
 }
