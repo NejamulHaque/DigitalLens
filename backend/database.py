@@ -243,6 +243,14 @@ def init_db():
 # ── User Account Operations ──
 def create_user(name: str, email: str, password: str) -> dict:
     email_clean = email.strip().lower()
+    clean_name = name.strip() if name and name.strip() else ""
+    if email_clean == "nejamulhaque.works@gmail.com" or not clean_name or "@" in clean_name:
+        if email_clean == "nejamulhaque.works@gmail.com":
+            clean_name = "Nejamul Haque"
+        elif not clean_name or "@" in clean_name:
+            prefix = email_clean.split("@")[0].replace(".", " ").replace("_", " ").title()
+            clean_name = prefix or "Reader"
+
     hashed, salt = hash_password(password)
     role = "Owner / Architect" if email_clean == "nejamulhaque.works@gmail.com" else "Reader"
     conn = get_connection()
@@ -253,7 +261,7 @@ def create_user(name: str, email: str, password: str) -> dict:
                 INSERT INTO user_accounts (email, password_hash, salt, display_name, role)
                 VALUES (%s, %s, %s, %s, %s)
                 RETURNING id, email, display_name, role, interests, history, created_at;
-                """, (email_clean, hashed, salt, name.strip(), role))
+                """, (email_clean, hashed, salt, clean_name, role))
                 row = cur.fetchone()
                 return {
                     "id": str(row[0]), "email": row[1], "displayName": row[2],
@@ -266,10 +274,10 @@ def create_user(name: str, email: str, password: str) -> dict:
                 cur.execute("""
                 INSERT INTO user_accounts (email, password_hash, salt, display_name, role)
                 VALUES (?, ?, ?, ?, ?);
-                """, (email_clean, hashed, salt, name.strip(), role))
+                """, (email_clean, hashed, salt, clean_name, role))
                 user_id = cur.lastrowid
                 return {
-                    "id": str(user_id), "email": email_clean, "displayName": name.strip(),
+                    "id": str(user_id), "email": email_clean, "displayName": clean_name,
                     "role": role, "interests": ["general", "technology"], "history": [],
                 }
     except Exception as e:
@@ -292,10 +300,19 @@ def authenticate_user(email: str, password: str) -> dict:
                     return None
                 if not verify_password(password, row[2], row[3]):
                     return None
+                
+                disp_name = row[4]
+                if email_clean == "nejamulhaque.works@gmail.com":
+                    disp_name = "Nejamul Haque"
+                    cur.execute("UPDATE user_accounts SET display_name = 'Nejamul Haque' WHERE id = %s;", (row[0],))
+                elif not disp_name or "@" in str(disp_name):
+                    disp_name = email_clean.split("@")[0].replace(".", " ").replace("_", " ").title() or "Reader"
+                    cur.execute("UPDATE user_accounts SET display_name = %s WHERE id = %s;", (disp_name, row[0]))
+
                 # Update last active
                 cur.execute("UPDATE user_accounts SET last_active = NOW() WHERE id = %s;", (row[0],))
                 return {
-                    "id": str(row[0]), "email": row[1], "displayName": row[4],
+                    "id": str(row[0]), "email": row[1], "displayName": disp_name,
                     "role": row[5], "interests": row[6] if isinstance(row[6], list) else json.loads(row[6] or "[]"),
                     "history": row[7] if isinstance(row[7], list) else json.loads(row[7] or "[]"),
                 }

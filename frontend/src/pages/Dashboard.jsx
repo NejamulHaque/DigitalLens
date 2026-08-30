@@ -1267,38 +1267,77 @@ function HistPanel({ history, onClose }) {
 
 // ── Prefs Panel ──
 function PrefsPanel({ user, profile, history, bookmarks, onUpdate, onClose }) {
-  const [interests,setInterests]=useState(profile?.interests||["general"]);
-  const [saving,setSaving]=useState(false);
-  const toggle=cat=>setInterests(i=>i.includes(cat)?i.filter(x=>x!==cat):[...i,cat]);
-  const save=async()=>{setSaving(true);await onUpdate(user.uid,{interests});setSaving(false);onClose();};
+  const [name, setName] = useState(
+    profile?.displayName || (user?.email === "nejamulhaque.works@gmail.com" ? "Nejamul Haque" : "")
+  );
+  const [interests, setInterests] = useState(profile?.interests || ["general"]);
+  const [saving, setSaving] = useState(false);
+  const toggle = (cat) =>
+    setInterests((i) => (i.includes(cat) ? i.filter((x) => x !== cat) : [...i, cat]));
+  const save = async () => {
+    setSaving(true);
+    await onUpdate(user?.uid || user?.id, {
+      displayName: name.trim() || profile?.displayName || "Reader",
+      interests,
+    });
+    setSaving(false);
+    onClose();
+  };
   return (
     <SidePanel title="◈ Preferences" onClose={onClose}>
       <div className="prefs-avatar-row">
         <div className="prefs-avi">
-          {profile?.photoURL
-            ? <img src={profile.photoURL} alt="" style={{width:"100%",height:"100%",borderRadius:"50%",objectFit:"cover"}}/>
-            : <span>{(profile?.displayName||"?")[0].toUpperCase()}</span>}
+          {profile?.photoURL ? (
+            <img
+              src={profile.photoURL}
+              alt=""
+              style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }}
+            />
+          ) : (
+            <span>{((name || profile?.displayName || "?")[0] || "?").toUpperCase()}</span>
+          )}
         </div>
-        <div>
-          <p className="prefs-name">{profile?.displayName||"Reader"}</p>
-          <p className="prefs-email">{user.email}</p>
-          <div style={{display:"flex",gap:5,marginTop:7,flexWrap:"wrap"}}>
-            {[["◉","Reader"],["◈",`${history.length} read`],["◇",`${bookmarks.length} saved`]].map(([g,l])=>(
-              <span key={l} className="prefs-badge">{g} {l}</span>
+        <div style={{ flex: 1 }}>
+          <p className="prefs-name">{name || profile?.displayName || "Reader"}</p>
+          <p className="prefs-email">{user?.email}</p>
+          <div style={{ display: "flex", gap: 5, marginTop: 7, flexWrap: "wrap" }}>
+            {[
+              ["◉", user?.role || profile?.role || "Reader"],
+              ["◈", `${history.length} read`],
+              ["◇", `${bookmarks.length} saved`],
+            ].map(([g, l]) => (
+              <span key={l} className="prefs-badge">
+                {g} {l}
+              </span>
             ))}
           </div>
         </div>
       </div>
+
+      <p className="prefs-section-label">Account Full Name</p>
+      <input
+        type="text"
+        className="search-inp"
+        style={{ width: "100%", marginBottom: 12 }}
+        placeholder="Enter your full name (e.g. Nejamul Haque)"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+      />
+
       <p className="prefs-section-label">Personalised Feed</p>
       <div className="prefs-cats">
-        {CATEGORIES.filter(c=>c.id!=="for-you").map(c=>(
-          <button key={c.id} className={`pref-cat${interests.includes(c.id)?" pref-on":""}`} onClick={()=>toggle(c.id)}>
+        {CATEGORIES.filter((c) => c.id !== "for-you").map((c) => (
+          <button
+            key={c.id}
+            className={`pref-cat${interests.includes(c.id) ? " pref-on" : ""}`}
+            onClick={() => toggle(c.id)}
+          >
             <span>{c.icon}</span> {c.label}
           </button>
         ))}
       </div>
-      <button className="cta-btn" onClick={save} disabled={saving} style={{width:"100%",marginTop:20}}>
-        {saving?"Saving…":"Save Preferences"}
+      <button className="cta-btn" onClick={save} disabled={saving} style={{ width: "100%", marginTop: 20 }}>
+        {saving ? "Saving…" : "Save Preferences"}
       </button>
     </SidePanel>
   );
@@ -1706,8 +1745,27 @@ const installApp=async()=>{
     });
   })();
   const [hero,...rest]=filtered;
-  const greet=()=>{const h=new Date().getHours(),n=(profile?.displayName||user?.displayName||"there").split(" ")[0];
-    if(h<12)return `${T.greetM}, ${n}`;if(h<17)return `${T.greetA}, ${n}`;return `${T.greetE}, ${n}`;};
+  const getFullCleanName = () => {
+    if (user?.email === "nejamulhaque.works@gmail.com") return "Nejamul Haque";
+    const n = (profile?.displayName || user?.displayName || "").trim();
+    if (!n || (n.includes("@") && !n.includes(" ")) || n.toLowerCase() === "reader") {
+      if (user?.email) {
+        const parts = user.email.split("@")[0].split(/[._-]/);
+        return parts.map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(" ") || "Reader";
+      }
+      return "Reader";
+    }
+    return n;
+  };
+
+  const greet = () => {
+    const h = new Date().getHours();
+    const fullName = getFullCleanName();
+    const firstName = fullName.split(" ")[0] || "Reader";
+    if (h < 12) return `${T.greetM}, ${firstName}`;
+    if (h < 17) return `${T.greetA}, ${firstName}`;
+    return `${T.greetE}, ${firstName}`;
+  };
   return (
     <div className={`np${dark?"":" np-light"}${loading?" np-loading":""}`}>
       <MarketBar />
@@ -1758,9 +1816,9 @@ const installApp=async()=>{
                   <div className="user-avi">
                     {profile?.photoURL
                       ?<img src={profile.photoURL} alt="" style={{width:"100%",height:"100%",borderRadius:"50%",objectFit:"cover"}}/>
-                      :<span>{(profile?.displayName||user?.email||"?")[0].toUpperCase()}</span>}
+                      :<span>{(getFullCleanName()[0]||"?").toUpperCase()}</span>}
                   </div>
-                  <span className="user-name-label">{(profile?.displayName||"Me").split(" ")[0]}</span>
+                  <span className="user-name-label">{getFullCleanName()}</span>
                   {(user?.role==="Pro Reader"||profile?.role==="Pro Reader"||user?.email==="nejamulhaque.works@gmail.com")&&(
                     <span className="pro-badge-pill" title="Pro Intelligence Member">PRO</span>
                   )}
@@ -1769,7 +1827,7 @@ const installApp=async()=>{
                 {userMenu&&(
                   <div className="user-dd" onClick={e=>e.stopPropagation()}>
                     <div className="udd-hdr">
-                      <p className="udd-name">{profile?.displayName||"Reader"}</p>
+                      <p className="udd-name">{getFullCleanName()}</p>
                       <p className="udd-email">{user?.email}</p>
                       <span className="udd-role">{user?.role || profile?.role || (user?.email==="nejamulhaque.works@gmail.com" ? "Owner / Architect" : "Reader")}</span>
                     </div>

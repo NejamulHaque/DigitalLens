@@ -7,6 +7,20 @@ const API = (rawApi.split(/\s+or\s+/i)[0] || rawApi).trim().replace(/\/+$/, "");
 const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
 
+const normalizeDisplayName = (name, email) => {
+  const cleanEmail = (email || "").trim().toLowerCase();
+  if (cleanEmail === "nejamulhaque.works@gmail.com") return "Nejamul Haque";
+  const n = (name || "").trim();
+  if (!n || n.includes("@") || n.toLowerCase() === "reader") {
+    if (cleanEmail) {
+      const parts = cleanEmail.split("@")[0].split(/[._-]/);
+      return parts.map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(" ") || "Reader";
+    }
+    return "Reader";
+  }
+  return n;
+};
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -19,14 +33,17 @@ export function AuthProvider({ children }) {
       const savedToken = localStorage.getItem("dl_user_token");
       if (savedUser && savedToken) {
         const u = JSON.parse(savedUser);
+        const cleanName = normalizeDisplayName(u.displayName, u.email);
+        u.displayName = cleanName;
         setUser(u);
         setProfile({
-          displayName: u.displayName || "Reader",
+          displayName: cleanName,
           email: u.email,
           interests: u.interests || ["general", "technology"],
           history: u.history || [],
-          role: u.role || "Reader",
+          role: u.role || (u.email === "nejamulhaque.works@gmail.com" ? "Owner / Architect" : "Reader"),
         });
+        localStorage.setItem("dl_user_data", JSON.stringify(u));
       }
     } catch {
       localStorage.removeItem("dl_user_data");
@@ -39,11 +56,13 @@ export function AuthProvider({ children }) {
   // ✍️ SIGN UP (name, email, password)
   const signup = async (name, email, password) => {
     let u = null;
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanName = normalizeDisplayName(name, cleanEmail);
     try {
       const res = await fetch(`${API}/api/auth/signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({ name: cleanName, email: cleanEmail, password }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -53,7 +72,7 @@ export function AuthProvider({ children }) {
         uid: data.user.id,
         id: data.user.id,
         email: data.user.email,
-        displayName: data.user.displayName,
+        displayName: normalizeDisplayName(data.user.displayName, data.user.email),
         role: data.user.role,
         interests: data.user.interests || ["general", "technology"],
         history: data.user.history || [],
@@ -73,9 +92,9 @@ export function AuthProvider({ children }) {
       u = {
         uid: `u_${Date.now()}`,
         id: `u_${Date.now()}`,
-        email: email.trim().toLowerCase(),
-        displayName: name.trim() || "Reader",
-        role: email.trim().toLowerCase() === "nejamulhaque.works@gmail.com" ? "Owner / Architect" : "Reader",
+        email: cleanEmail,
+        displayName: cleanName,
+        role: cleanEmail === "nejamulhaque.works@gmail.com" ? "Owner / Architect" : "Reader",
         interests: ["general", "technology"],
         history: [],
       };
@@ -90,11 +109,12 @@ export function AuthProvider({ children }) {
   // 🔑 LOGIN (email, password)
   const login = async (email, password) => {
     let u = null;
+    const cleanEmail = email.trim().toLowerCase();
     try {
       const res = await fetch(`${API}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: cleanEmail, password }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -104,7 +124,7 @@ export function AuthProvider({ children }) {
         uid: data.user.id,
         id: data.user.id,
         email: data.user.email,
-        displayName: data.user.displayName,
+        displayName: normalizeDisplayName(data.user.displayName, data.user.email),
         role: data.user.role,
         interests: data.user.interests || ["general", "technology"],
         history: data.user.history || [],
@@ -124,8 +144,9 @@ export function AuthProvider({ children }) {
       if (savedUserStr) {
         try {
           const saved = JSON.parse(savedUserStr);
-          if (saved.email === email.trim().toLowerCase()) {
+          if (saved.email === cleanEmail) {
             u = saved;
+            u.displayName = normalizeDisplayName(u.displayName, cleanEmail);
           }
         } catch {}
       }
@@ -133,9 +154,9 @@ export function AuthProvider({ children }) {
         u = {
           uid: `u_${Date.now()}`,
           id: `u_${Date.now()}`,
-          email: email.trim().toLowerCase(),
-          displayName: email.split("@")[0] || "Reader",
-          role: email.trim().toLowerCase() === "nejamulhaque.works@gmail.com" ? "Owner / Architect" : "Reader",
+          email: cleanEmail,
+          displayName: normalizeDisplayName("", cleanEmail),
+          role: cleanEmail === "nejamulhaque.works@gmail.com" ? "Owner / Architect" : "Reader",
           interests: ["general", "technology"],
           history: [],
         };
