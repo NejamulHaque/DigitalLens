@@ -52,16 +52,26 @@ def get_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
-# ── Password Hashing Helpers ──
+# ── Password Hashing Helpers (PBKDF2-HMAC-SHA256 with 100,000 rounds) ──
 def hash_password(password: str, salt: str = None) -> tuple[str, str]:
     if not salt:
         salt = secrets.token_hex(16)
-    hashed = hashlib.sha256((salt + password).encode("utf-8")).hexdigest()
+    # Using military-grade PBKDF2-HMAC-SHA256
+    hashed = hashlib.pbkdf2_hmac(
+        "sha256",
+        password.encode("utf-8"),
+        salt.encode("utf-8"),
+        100000
+    ).hex()
     return hashed, salt
 
 def verify_password(password: str, hashed: str, salt: str) -> bool:
     expected_hash, _ = hash_password(password, salt)
-    return secrets.compare_digest(expected_hash, hashed)
+    if secrets.compare_digest(expected_hash, hashed):
+        return True
+    # Legacy SHA256 fallback compatibility for existing accounts
+    legacy_hash = hashlib.sha256((salt + password).encode("utf-8")).hexdigest()
+    return secrets.compare_digest(legacy_hash, hashed)
 
 def init_db():
     """Initializes all database tables on startup (works on Neon PostgreSQL & SQLite)."""

@@ -116,7 +116,7 @@ function SPill({ mood, xs }) {
 }
 
 // ── Ticker ──
-function Ticker({ articles }) {
+function Ticker({ articles, onOpen }) {
   if(!articles.length)return null;
   const items=articles.slice(0,10);
   return (
@@ -125,9 +125,9 @@ function Ticker({ articles }) {
       <div className="ticker-track">
         <div className="ticker-reel">
           {[...items,...items].map((a,i)=>(
-            <span key={i} className="ticker-item">
+            <span key={i} className="ticker-item" onClick={()=>onOpen&&onOpen(a)} style={{cursor:"pointer"}}>
               <span style={{color:MOOD[a.sentiment?.mood||"neutral"].color,fontSize:8}}>◆</span>
-              <a href={a.url} target="_blank" rel="noreferrer" className="ticker-link">{a.title}</a>
+              <span className="ticker-link">{a.title}</span>
               <span className="ticker-src">— {a.source}</span>
             </span>
           ))}
@@ -138,7 +138,7 @@ function Ticker({ articles }) {
 }
 
 // ── Breaking ─
-function Breaking({ articles, onDismiss }) {
+function Breaking({ articles, onDismiss, onOpen }) {
   const worst=articles.filter(a=>a.sentiment?.mood==="negative"&&(a.sentiment?.score||0)>0.85)
     .sort((a,b)=>(b.sentiment?.score||0)-(a.sentiment?.score||0))[0];
   if(!worst)return null;
@@ -294,9 +294,16 @@ function HeroCard({ article, bookmarked, onBookmark, onShare, onOpen }) {
 
         <div className="hero-foot" onClick={(e) => e.stopPropagation()}>
           <div className="hero-cta-group">
-            <a href={article.url} target="_blank" rel="noreferrer" className="hero-read">
+            <button
+              type="button"
+              className="hero-read"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpen(article);
+              }}
+            >
               Read Full Wire ↗
-            </a>
+            </button>
             <button
               type="button"
               className={`act-pill-btn ${speaking ? "act-speaking" : ""}`}
@@ -416,7 +423,16 @@ function ArticleCard({ article, bookmarked, onBookmark, onShare, onOpen, list })
         {tldr?<p className="card-tldr">⚡ {tldr}</p>:<p className="card-sum">{article.summary}</p>}
         {article.tags?.length>0&&<div className="tag-row">{article.tags.slice(0,3).map(t=><span key={t} className="tag">#{t}</span>)}</div>}
         <div className="card-foot" onClick={e=>e.stopPropagation()}>
-          <a href={article.url} target="_blank" rel="noreferrer" className="card-read">Full story →</a>
+          <button
+            type="button"
+            className="card-read"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpen(article);
+            }}
+          >
+            Full story →
+          </button>
           <div style={{display:"flex",gap:5}}>
             <button className={`act-xs${speaking?" bm-active":""}`} onClick={handleSpeak} title="Listen aloud">{speaking?"■":"🔊"}</button>
             <button className="act-xs" onClick={getTLDR} disabled={ltldr} title="1-Sentence TL;DR">{ltldr?"…":tldr?"↺":"⚡"}</button>
@@ -1707,11 +1723,38 @@ const installApp=async()=>{
     } catch {}
   }, [user, profile]);
 
-  const handleBM=a=>{const has=bookmarks.find(b=>b.url===a.url);setBookmarks(has?bookmarks.filter(b=>b.url!==a.url):[a,...bookmarks]);toast_(has?"Removed from saved":"Saved ◈");};
-  const handleShare=async a=>{if(navigator.share){try{await navigator.share({title:a.title,url:a.url});}catch{}}else{navigator.clipboard.writeText(a.url);toast_("Link copied ↗");}};
-  const handleOpen=a=>{
+  const requireAuth = (msg = "🔒 Sign in or create an account to access live news & AI features") => {
+    if (!user) {
+      setShowAuthModal(true);
+      toast_(msg);
+      return false;
+    }
+    return true;
+  };
+
+  const handleBM = (a) => {
+    if (!requireAuth("🔒 Sign in to bookmark news stories")) return;
+    const has = bookmarks.find((b) => b.url === a.url);
+    setBookmarks(has ? bookmarks.filter((b) => b.url !== a.url) : [a, ...bookmarks]);
+    toast_(has ? "Removed from saved" : "Saved ◈");
+  };
+
+  const handleShare = async (a) => {
+    if (!requireAuth("🔒 Sign in to share stories")) return;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: a.title, url: a.url });
+      } catch {}
+    } else {
+      navigator.clipboard.writeText(a.url);
+      toast_("Link copied ↗");
+    }
+  };
+
+  const handleOpen = (a) => {
+    if (!requireAuth("🔒 Access Restricted: Please sign in or create an account to read news stories")) return;
     setSelected(a);
-    const nextHist = [a, ...history.filter(x => x.url !== a.url)].slice(0, 50);
+    const nextHist = [a, ...history.filter((x) => x.url !== a.url)].slice(0, 50);
     setHistory(nextHist);
     if (user && updateUserProfile) updateUserProfile({ history: nextHist });
     try {
@@ -1770,7 +1813,7 @@ const installApp=async()=>{
     <div className={`np${dark?"":" np-light"}${loading?" np-loading":""}`}>
       <MarketBar />
       {toast&&<div className="toast">{toast}</div>}
-      {flags.ticker&&articles.length>0&&<Ticker articles={articles}/>}
+      {flags.ticker&&articles.length>0&&<Ticker articles={articles} onOpen={handleOpen}/>}
       {announce&&<div className={`admin-banner admin-banner-${announcePriority}`}>◉ LIVE BROADCAST: {announce}</div>}
       {/* ── Header ─ */}
       <header className="npnav">
@@ -1789,12 +1832,12 @@ const installApp=async()=>{
             <button className="search-go" onClick={()=>setQuery(searchInput.trim())}>{lang==="hi"?"खोजें":"Search"}</button>
           </div>
           <div className="npnav-right">
-            <button className="nav-pill" onClick={()=>setShowDigest(true)}>◉ Digest</button>
-            {flags.quiz&&<button className="nav-pill" onClick={()=>setShowQuiz(true)}>⬡ Quiz</button>}
-            <button className="nav-icon" title="History" onClick={()=>setShowHist(true)}>
+            <button className="nav-pill" onClick={() => { if (!requireAuth("🔒 Sign in to generate Daily Executive Digest")) return; setShowDigest(true); }}>◉ Digest</button>
+            {flags.quiz&&<button className="nav-pill" onClick={() => { if (!requireAuth("🔒 Sign in to play News Quiz")) return; setShowQuiz(true); }}>⬡ Quiz</button>}
+            <button className="nav-icon" title="History" onClick={() => { if (!requireAuth("🔒 Sign in to view Reading History")) return; setShowHist(true); }}>
               ◎{history.length>0&&<span className="nav-badge">{Math.min(history.length,9)}</span>}
             </button>
-            <button className="nav-icon" title="Saved" onClick={()=>setShowSaved(true)}>
+            <button className="nav-icon" title="Saved" onClick={() => { if (!requireAuth("🔒 Sign in to view Saved Articles")) return; setShowSaved(true); }}>
               ◇{bookmarks.length>0&&<span className="nav-badge">{bookmarks.length}</span>}
             </button>
             <select className="nav-lang" value={lang} title="News language / क्षेत्रीय भाषा"
@@ -1908,6 +1951,26 @@ const installApp=async()=>{
           </div>
         )}
         {!loading&&articles.length>0&&<TrendCloud articles={articles} onTag={handleTag} label={T.trending}/>}
+        {/* Auth Gate Banner for Unauthenticated Visitors */}
+        {!user && !loading && (
+          <div className="auth-gate-banner" onClick={() => setShowAuthModal(true)}>
+            <div className="ag-left">
+              <div className="ag-tag">
+                <span className="ag-lock-dot" />
+                <span>AUTHENTICATION REQUIRED · MEMBERS ONLY</span>
+              </div>
+              <h2 className="ag-title">Sign in to unlock full stories & AI intelligence</h2>
+              <p className="ag-desc">
+                Real-time wire reading, sentiment tracking, and AI analytical breakdowns are restricted to registered members.
+              </p>
+            </div>
+            <div className="ag-right" onClick={(e) => e.stopPropagation()}>
+              <button className="ag-btn-gold" onClick={() => setShowAuthModal(true)}>
+                Sign In / Create Account ↗
+              </button>
+            </div>
+          </div>
+        )}
         {/* Content area */}
         {loading?(
           <div className={layout==="list"?"list-view":"editorial"}>
@@ -1929,11 +1992,11 @@ const installApp=async()=>{
             </button>
           </div>
         ):layout==="list"?(
-          <div className="list-view">
+          <div className={`list-view ${!user ? "feed-locked" : ""}`}>
             {filtered.map((a,i)=><ArticleCard key={i} article={a} list bookmarked={!!bookmarks.find(b=>b.url===a.url)} onBookmark={handleBM} onShare={handleShare} onOpen={handleOpen}/>)}
           </div>
         ):(
-          <div className="editorial">
+          <div className={`editorial ${!user ? "feed-locked" : ""}`}>
             {hero&&<div className="e-hero"><HeroCard article={hero} bookmarked={!!bookmarks.find(b=>b.url===hero.url)} onBookmark={handleBM} onShare={handleShare} onOpen={handleOpen}/></div>}
             {rest.slice(0,2).map((a,i)=><div key={i} className="e-stack"><ArticleCard article={a} bookmarked={!!bookmarks.find(b=>b.url===a.url)} onBookmark={handleBM} onShare={handleShare} onOpen={handleOpen}/></div>)}
             {rest.slice(2).map((a,i)=><div key={i} className="e-grid"><ArticleCard article={a} bookmarked={!!bookmarks.find(b=>b.url===a.url)} onBookmark={handleBM} onShare={handleShare} onOpen={handleOpen}/></div>)}
