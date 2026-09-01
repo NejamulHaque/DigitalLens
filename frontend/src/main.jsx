@@ -1,27 +1,61 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import "./index.css";
 import AdminPage from "./pages/AdminPage.jsx";
+import App from "./App.jsx";
+import LandingPage from "./pages/LandingPage.jsx";
+import { AuthProvider, useAuth } from "./context/AuthContext";
 
-import App from "./App.jsx";                      // Your original news app
-import LandingPage from "./pages/LandingPage.jsx"; // Your new landing page
+function ProtectedRoute({ children }) {
+  const { user, loading } = useAuth() || {};
 
-// 👇 1. IMPORT YOUR AUTH PROVIDER HERE 👇
-import { AuthProvider } from "./context/AuthContext"; 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white">
+        <div className="w-10 h-10 border-4 border-purple-500/20 border-t-purple-500 rounded-full animate-spin mb-4" />
+        <p className="font-mono text-xs text-purple-300 tracking-wider">VERIFYING DIGITAL LENS SECURITY SESSION…</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/?auth=login" replace />;
+  }
+
+  return children;
+}
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    {/* 👇 2. WRAP THE ROUTER INSIDE THE AUTH PROVIDER 👇 */}
     <AuthProvider>
       <BrowserRouter>
         <Routes>
           {/* 🌟 Landing page at root */}
           <Route path="/" element={<LandingPage />} />
-          <Route path="/admin" element={<AdminPage />} />
           
-          {/* 📰 News app at /app */}
-          <Route path="/app" element={<App />} />
+          {/* 🛡️ Protected Admin Console */}
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute>
+                <AdminPage />
+              </ProtectedRoute>
+            }
+          />
+          
+          {/* 📰 Protected News Dashboard at /app */}
+          <Route
+            path="/app"
+            element={
+              <ProtectedRoute>
+                <App />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Catch-all redirect to Landing Page */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

@@ -1590,121 +1590,169 @@ export default function Dashboard() {
   useEffect(()=>{fetch(`${API}/api/announce`).then(r=>r.json()).then(d=>{if(d){setAnnounce(d.text||"");setAnnouncePriority(d.priority||"info");setFlags(f=>({...f,...(d.flags||{})}));}}).catch(()=>{});},[]);
   const searchRef=useRef();
   const toast_=msg=>{setToast(msg);setTimeout(()=>setToast(null),2600);};
-  const fetchPage=useCallback(async(offset,replace)=>{
-  if(replace){setLoading(true);setError(null);setDismissBrk(false);}else{setLoadingMore(true);}
-  try{
-    const p=new URLSearchParams({limit:12,offset});
-    p.set("category",category==="for-you"?"general":category);
-    if(query)p.set("q",query);
-    p.set("lang",lang);
-    const r=await fetch(`${API}/news?${p}`);
-    if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.detail||`Error ${r.status}`);}
-    const d=await r.json();
-    const incoming=d.articles||[];
-    setArticles(prev=>{
-      if(replace)return incoming;
-      const have=new Set(prev.map(a=>a.url));
-      return [...prev,...incoming.filter(a=>!have.has(a.url))];
-    });
-    setSource(d.source||"live");
-    setHasMore(!!d.has_more);
-  }catch(e){
-    if(replace){
-      // Graceful offline neural backup so dashboard is never empty
-      const backup = [
-        {
-          title: "Global AI & Neural Computing Architecture Advances With Quantum Efficiency Gains",
-          source: "DigitalLens Wire",
-          summary: "Researchers announce breakthrough neural models with 40% compute efficiency improvements, accelerating global medical discovery and climate simulations.",
-          sentiment: { mood: "positive", score: 0.88 },
-          bias: { lean: "Center / Tech Verified", credibility_score: 98, fact_status: "Verified Documentation" },
-          published_at: new Date().toISOString(),
-          tags: ["technology", "quantum", "AI", "breakthrough"],
-          category: category === "for-you" ? "general" : category,
-          url: "https://digitallens.vercel.app",
-        },
-        {
-          title: "Markets Rally Globally as Core Inflation Stabilizes Across Major Economic Hubs",
-          source: "Financial News Network",
-          summary: "Major equity and tech indices advance following positive macroeconomic reports indicating sustained disinflation and resilient consumer demand.",
-          sentiment: { mood: "positive", score: 0.82 },
-          bias: { lean: "Financial Neutral", credibility_score: 97, fact_status: "Central Bank Data Verified" },
-          published_at: new Date(Date.now() - 3600000).toISOString(),
-          tags: ["markets", "economy", "growth", "stocks"],
-          category: category === "for-you" ? "general" : category,
-          url: "https://digitallens.vercel.app",
-        },
-        {
-          title: "Clean Energy Grid Expansion Crosses Historic 4,000 Gigawatt Milestone",
-          source: "Global Science Monitor",
-          summary: "International energy agencies report solar and wind capacity exceeding long-term climate projections, reducing industrial energy costs.",
-          sentiment: { mood: "positive", score: 0.91 },
-          bias: { lean: "Scientific Neutral", credibility_score: 99, fact_status: "Global Agency Confirmed" },
-          published_at: new Date(Date.now() - 7200000).toISOString(),
-          tags: ["science", "energy", "climate", "sustainability"],
-          category: category === "for-you" ? "general" : category,
-          url: "https://digitallens.vercel.app",
+  const fetchPage = useCallback(
+    async (offset, replace) => {
+      if (!user) return;
+      if (replace) {
+        setLoading(true);
+        setError(null);
+        setDismissBrk(false);
+      } else {
+        setLoadingMore(true);
+      }
+      try {
+        const p = new URLSearchParams({ limit: 12, offset });
+        p.set("category", category === "for-you" ? "general" : category);
+        if (query) p.set("q", query);
+        p.set("lang", lang);
+        const r = await fetch(`${API}/news?${p}`);
+        if (!r.ok) {
+          const e = await r.json().catch(() => ({}));
+          throw new Error(e.detail || `Error ${r.status}`);
         }
-      ];
-      setArticles(backup);
-      setSource("offline-cache");
-      toast_("ℹ️ Running in Offline Mode. Start backend for live feeds.");
-    }
-  }
-  finally{setLoading(false);setLoadingMore(false);}
-},[category,query,lang]);
-useEffect(()=>{fetchPage(0,true);},[fetchPage]);
-// ── INFINITE SCROLL: auto-load next page near bottom ──
-useEffect(()=>{
-  const el=loadMoreRef.current;
-  if(!el)return;
-  const ob=new IntersectionObserver(en=>{
-    if(en[0].isIntersecting&&!loading&&!loadingMore&&hasMore&&!error){
-      fetchPage(articles.length,false);
-    }
-  },{rootMargin:"600px"});
-  ob.observe(el);
-  return()=>ob.disconnect();
-},[articles.length,loading,loadingMore,hasMore,error,fetchPage]);
-// ── PWA install prompt capture ──
-useEffect(()=>{
-  const h=e=>{e.preventDefault();setInstallEvt(e);};
-  window.addEventListener("beforeinstallprompt",h);
-  return()=>window.removeEventListener("beforeinstallprompt",h);
-},[]);
-const installApp=async()=>{
-  if(!installEvt)return;
-  installEvt.prompt();
-  await installEvt.userChoice;
-  setInstallEvt(null);
-};
-  useEffect(()=>{try{localStorage.setItem("np_bm4",JSON.stringify(bookmarks));}catch{}},[bookmarks]);
-  useEffect(()=>{try{localStorage.setItem("np_hist4",JSON.stringify(history));}catch{}},[history]);
-  useEffect(()=>{
-    try{localStorage.setItem("dl_theme",dark?"dark":"light");}catch{}
-    document.documentElement.setAttribute("data-dl-theme",dark?"dark":"light");
-  },[dark]);
-  useEffect(()=>{
-    const h=e=>{
-      if(e.key==="/"&&document.activeElement!==searchRef.current){e.preventDefault();searchRef.current?.focus();}
+        const d = await r.json();
+        const incoming = d.articles || [];
+        setArticles((prev) => {
+          if (replace) return incoming;
+          const have = new Set(prev.map((a) => a.url));
+          return [...prev, ...incoming.filter((a) => !have.has(a.url))];
+        });
+        setSource(d.source || "live");
+        setHasMore(!!d.has_more);
+      } catch (e) {
+        if (replace) {
+          // Graceful offline neural backup so dashboard is never empty
+          const backup = [
+            {
+              title: "Global AI & Neural Computing Architecture Advances With Quantum Efficiency Gains",
+              source: "DigitalLens Wire",
+              summary: "Researchers announce breakthrough neural models with 40% compute efficiency improvements, accelerating global medical discovery and climate simulations.",
+              sentiment: { mood: "positive", score: 0.88 },
+              bias: { lean: "Center / Tech Verified", credibility_score: 98, fact_status: "Verified Documentation" },
+              published_at: new Date().toISOString(),
+              tags: ["technology", "quantum", "AI", "breakthrough"],
+              category: category === "for-you" ? "general" : category,
+              url: "https://digitallens.vercel.app",
+            },
+            {
+              title: "Markets Rally Globally as Core Inflation Stabilizes Across Major Economic Hubs",
+              source: "Financial News Network",
+              summary: "Major equity and tech indices advance following positive macroeconomic reports indicating sustained disinflation and resilient consumer demand.",
+              sentiment: { mood: "positive", score: 0.82 },
+              bias: { lean: "Financial Neutral", credibility_score: 97, fact_status: "Central Bank Data Verified" },
+              published_at: new Date(Date.now() - 3600000).toISOString(),
+              tags: ["markets", "economy", "growth", "stocks"],
+              category: category === "for-you" ? "general" : category,
+              url: "https://digitallens.vercel.app",
+            },
+            {
+              title: "Clean Energy Grid Expansion Crosses Historic 4,000 Gigawatt Milestone",
+              source: "Global Science Monitor",
+              summary: "International energy agencies report solar and wind capacity exceeding long-term climate projections, reducing industrial energy costs.",
+              sentiment: { mood: "positive", score: 0.91 },
+              bias: { lean: "Scientific Neutral", credibility_score: 99, fact_status: "Global Agency Confirmed" },
+              published_at: new Date(Date.now() - 7200000).toISOString(),
+              tags: ["science", "energy", "climate", "sustainability"],
+              category: category === "for-you" ? "general" : category,
+              url: "https://digitallens.vercel.app",
+            },
+          ];
+          setArticles(backup);
+          setSource("offline-cache");
+          toast_("ℹ️ Running in Offline Mode. Start backend for live feeds.");
+        }
+      } finally {
+        setLoading(false);
+        setLoadingMore(false);
+      }
+    },
+    [category, query, lang, user]
+  );
+
+  useEffect(() => {
+    if (user) fetchPage(0, true);
+  }, [fetchPage, user]);
+
+  // ── INFINITE SCROLL: auto-load next page near bottom ──
+  useEffect(() => {
+    const el = loadMoreRef.current;
+    if (!el) return;
+    const ob = new IntersectionObserver(
+      (en) => {
+        if (en[0].isIntersecting && !loading && !loadingMore && hasMore && !error && user) {
+          fetchPage(articles.length, false);
+        }
+      },
+      { rootMargin: "600px" }
+    );
+    ob.observe(el);
+    return () => ob.disconnect();
+  }, [articles.length, loading, loadingMore, hasMore, error, fetchPage, user]);
+
+  // ── PWA install prompt capture ──
+  useEffect(() => {
+    const h = (e) => {
+      e.preventDefault();
+      setInstallEvt(e);
     };
-    window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h);
-  },[]);
-  useEffect(()=>{
-    if(!userMenu)return;
-    const h=()=>setUserMenu(false);
-    setTimeout(()=>document.addEventListener("click",h),0);
-    return()=>document.removeEventListener("click",h);
-  },[userMenu]);
+    window.addEventListener("beforeinstallprompt", h);
+    return () => window.removeEventListener("beforeinstallprompt", h);
+  }, []);
+
+  const installApp = async () => {
+    if (!installEvt) return;
+    installEvt.prompt();
+    await installEvt.userChoice;
+    setInstallEvt(null);
+  };
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("np_bm4", JSON.stringify(bookmarks));
+    } catch {}
+  }, [bookmarks]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("np_hist4", JSON.stringify(history));
+    } catch {}
+  }, [history]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("dl_theme", dark ? "dark" : "light");
+    } catch {}
+    document.documentElement.setAttribute("data-dl-theme", dark ? "dark" : "light");
+  }, [dark]);
+
+  useEffect(() => {
+    const h = (e) => {
+      if (e.key === "/" && document.activeElement !== searchRef.current) {
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, []);
+
+  useEffect(() => {
+    if (!userMenu) return;
+    const h = () => setUserMenu(false);
+    setTimeout(() => document.addEventListener("click", h), 0);
+    return () => document.removeEventListener("click", h);
+  }, [userMenu]);
+
   // ── V5 SPOTLIGHT: cursor coordinates for card glow ──
-  useEffect(()=>{
-    const h=(e)=>{
+  useEffect(() => {
+    const h = (e) => {
       document.documentElement.style.setProperty("--mx", e.clientX + "px");
       document.documentElement.style.setProperty("--my", e.clientY + "px");
     };
     window.addEventListener("mousemove", h);
-    return ()=>window.removeEventListener("mousemove", h);
-  },[]);
+    return () => window.removeEventListener("mousemove", h);
+  }, []);
+
   // ── Real-Time Telemetry Tracking ──
   useEffect(() => {
     try {
@@ -1771,23 +1819,34 @@ const installApp=async()=>{
       }).catch(() => {});
     } catch {}
   };
-  const handleTag=t=>{setSearch(t);setQuery(t);};
-  const filtered=(()=>{
-    const keys=interests.filter(i=>i!=="general");
-    let list=category==="for-you"
-      ?articles.filter(a=>{const t=(a.title+" "+(a.summary||"")+" "+(a.tags||[]).join(" ")).toLowerCase();return keys.some(k=>t.includes(k));})
-      :articles;
-    if(category==="for-you"&&list.length<3)list=articles;
-    if(filterMood!=="all")list=list.filter(a=>a.sentiment?.mood===filterMood);
-    return [...list].sort((a,b)=>{
-      if(sortBy==="latest")return new Date(b.published_at)-new Date(a.published_at);
-      if(sortBy==="oldest")return new Date(a.published_at)-new Date(b.published_at);
-      if(sortBy==="positive")return (b.sentiment?.score||0)-(a.sentiment?.score||0);
-      if(sortBy==="negative")return (a.sentiment?.score||0)-(b.sentiment?.score||0);
+
+  const handleTag = (t) => {
+    setSearch(t);
+    setQuery(t);
+  };
+
+  const filtered = (() => {
+    const keys = interests.filter((i) => i !== "general");
+    let list =
+      category === "for-you"
+        ? articles.filter((a) => {
+            const t = (a.title + " " + (a.summary || "") + " " + (a.tags || []).join(" ")).toLowerCase();
+            return keys.some((k) => t.includes(k));
+          })
+        : articles;
+    if (category === "for-you" && list.length < 3) list = articles;
+    if (filterMood !== "all") list = list.filter((a) => a.sentiment?.mood === filterMood);
+    return [...list].sort((a, b) => {
+      if (sortBy === "latest") return new Date(b.published_at) - new Date(a.published_at);
+      if (sortBy === "oldest") return new Date(a.published_at) - new Date(b.published_at);
+      if (sortBy === "positive") return (b.sentiment?.score || 0) - (a.sentiment?.score || 0);
+      if (sortBy === "negative") return (a.sentiment?.score || 0) - (b.sentiment?.score || 0);
       return 0;
     });
   })();
-  const [hero,...rest]=filtered;
+
+  const [hero, ...rest] = filtered;
+
   const getFullCleanName = () => {
     if (user?.email === "nejamulhaque.works@gmail.com") return "Nejamul Haque";
     const n = (profile?.displayName || user?.displayName || "").trim();
@@ -1809,6 +1868,46 @@ const installApp=async()=>{
     if (h < 17) return `${T.greetA}, ${firstName}`;
     return `${T.greetE}, ${firstName}`;
   };
+
+  if (!user && !loading) {
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#090d16", color: "#ffffff", padding: "24px", textAlign: "center" }}>
+        <div style={{ width: 64, height: 64, borderRadius: "18px", background: "linear-gradient(135deg, #7c3aed, #4f46e5)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, marginBottom: 20, boxShadow: "0 10px 30px rgba(124, 58, 237, 0.4)" }}>
+          🔒
+        </div>
+        <h1 style={{ fontSize: "24px", fontWeight: 800, marginBottom: "8px", letterSpacing: "-0.02em" }}>
+          Authentication Required
+        </h1>
+        <p style={{ fontSize: "14px", color: "#94a3b8", maxWidth: "420px", marginBottom: "28px", lineHeight: 1.6 }}>
+          Live wire news feeds, real-time sentiment scoring, and AI digests are strictly protected. Please sign in or create an account to access the newsroom.
+        </p>
+        <div style={{ display: "flex", flexDirection: "column", gap: "12px", width: "100%", maxWidth: "280px" }}>
+          <button
+            onClick={() => setShowAuthModal(true)}
+            style={{ padding: "12px 24px", borderRadius: "12px", background: "linear-gradient(135deg, #7c3aed, #2563eb)", color: "#ffffff", fontWeight: 700, fontSize: "14px", border: "none", cursor: "pointer", boxShadow: "0 4px 16px rgba(124, 58, 237, 0.4)" }}
+          >
+            Sign In / Create Account ↗
+          </button>
+          <button
+            onClick={() => { window.location.href = "/"; }}
+            style={{ padding: "10px 20px", borderRadius: "12px", background: "rgba(255, 255, 255, 0.06)", color: "#cbd5e1", fontWeight: 600, fontSize: "13px", border: "1px solid rgba(255, 255, 255, 0.12)", cursor: "pointer" }}
+          >
+            ← Back to Landing Page
+          </button>
+        </div>
+        {showAuthModal && (
+          <AuthModal
+            type="login"
+            isOpen={showAuthModal}
+            onClose={() => {
+              setShowAuthModal(false);
+              window.location.href = "/";
+            }}
+          />
+        )}
+      </div>
+    );
+  }
   return (
     <div className={`np${dark?"":" np-light"}${loading?" np-loading":""}`}>
       <MarketBar />

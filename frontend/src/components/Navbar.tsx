@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { FiMenu, FiX, FiLogOut, FiShield } from "react-icons/fi";
 import { useAuth } from "../context/AuthContext";
 import AuthModal from "./AuthModal";
@@ -12,6 +12,17 @@ export default function Navbar() {
   const user = auth?.user;
   const logout = auth?.logout;
   const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const authParam = params.get("auth");
+    if (authParam === "login" || authParam === "required") {
+      setShowAuth("login");
+    } else if (authParam === "signup") {
+      setShowAuth("signup");
+    }
+  }, [location.search]);
 
   const isOwner = user?.email === "nejamulhaque.works@gmail.com";
 
@@ -175,7 +186,16 @@ export default function Navbar() {
 
       <AnimatePresence>
         {showAuth && (
-          <AuthModal type={showAuth} onClose={() => setShowAuth(null)} onSwitch={(t) => setShowAuth(t)} />
+          <AuthModal
+            type={showAuth}
+            onClose={() => {
+              setShowAuth(null);
+              if (window.location.search.includes("auth=")) {
+                window.history.replaceState({}, document.title, window.location.pathname);
+              }
+            }}
+            onSwitch={(t) => setShowAuth(t)}
+          />
         )}
       </AnimatePresence>
     </>

@@ -169,7 +169,7 @@ export function AuthProvider({ children }) {
     return u;
   };
 
-  // 🚪 LOGOUT
+  // 🚪 LOGOUT — Clears session and moves user to Landing Page
   const logout = () => {
     setUser(null);
     setProfile(null);
@@ -177,6 +177,7 @@ export function AuthProvider({ children }) {
       localStorage.removeItem("dl_user_token");
       localStorage.removeItem("dl_user_data");
     } catch {}
+    window.location.href = "/";
   };
 
   // ⚙️ UPDATE PROFILE (interests, history, displayName)
